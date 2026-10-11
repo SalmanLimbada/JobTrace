@@ -156,12 +156,25 @@ export default function Home() {
     }
   }
 
-  function handleDeleteJob(id: string) {
+  async function handleDeleteJob(id: string) {
     setJobs((prevJobs) => {
       const updatedJobs = { ...prevJobs };
       delete updatedJobs[id];
       return updatedJobs;
     });
+
+    try {
+      const { error } = await supabase
+        .from("applications")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("Error deleting application in Supabase:", error.message);
+      }
+    } catch (err) {
+      console.error("Failed to delete application from Supabase:", err);
+    }
   }
 
   function handleImportJobs(newJobsMap: Record<string, JobApplication>) {
