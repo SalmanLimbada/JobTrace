@@ -1,33 +1,53 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import StatsBanner from "@/components/StatsBanner";
 import JobForm, { type NewJobPayload } from "@/components/JobForm";
 import JobTable from "@/components/JobTable";
-
-const initialJobsMap: Record<string, JobApplication> = {
-  "1": {
-    id: "1",
-    company: "Google",
-    role: "Frontend Engineer",
-    appliedDate: "2026-09-25",
-    url: "https://careers.google.com",
-    status: "Interview",
-    notes: "I wish bro",
-  },
-  "2": {
-    id: "2",
-    company: "Stripe",
-    role: "Software Engineer",
-    appliedDate: "2026-09-26",
-    url: "https://stripe.com/jobs",
-    status: "Applied",
-    notes: "In my dreams",
-  },
-};
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
-  const [jobs, setJobs] = useState<Record<string, JobApplication>>(initialJobsMap);
+  const [jobs, setJobs] = useState<Record<string, JobApplication>>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchApplications() {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("applications")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("Error fetching applications:", error.message);
+          return;
+        }
+
+        if (data) {
+          const map: Record<string, JobApplication> = {};
+          for (const row of data) {
+            map[row.id] = {
+              id: row.id,
+              company: row.company,
+              role: row.role,
+              status: row.status,
+              appliedDate: row.applied_date,
+              url: row.url || "#",
+              notes: row.notes || "",
+            };
+          }
+          setJobs(map);
+        }
+      } catch (err) {
+        console.error("Failed to connect to Supabase:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchApplications();
+  }, []);
 
   const jobList = Object.values(jobs);
   const totalCount = jobList.length;
@@ -101,13 +121,20 @@ export default function Home() {
 
       <JobForm onAddJob={handleAddJob} />
 
-      <JobTable
-        jobs={jobList}
-        onStatusChange={handleStatusChange}
-        onSaveEdit={handleSaveEdit}
-        onDeleteJob={handleDeleteJob}
-        onImportJobs={handleImportJobs}
-      />
+      {isLoading ? (
+        <div className="p-12 text-center text-zinc-400">
+          <div className="inline-block w-6 h-6 border-2 border-zinc-500 border-t-zinc-100 rounded-full animate-spin mb-3"></div>
+          <p className="text-sm">Connecting to cloud database...</p>
+        </div>
+      ) : (
+        <JobTable
+          jobs={jobList}
+          onStatusChange={handleStatusChange}
+          onSaveEdit={handleSaveEdit}
+          onDeleteJob={handleDeleteJob}
+          onImportJobs={handleImportJobs}
+        />
+      )}
     </main>
   );
 }
