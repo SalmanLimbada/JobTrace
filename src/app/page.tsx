@@ -55,22 +55,51 @@ export default function Home() {
   const offerCount = jobList.filter((j) => j.status === "Offer").length;
   const rejectedCount = jobList.filter((j) => j.status === "Rejected").length;
 
-  function handleAddJob(payload: NewJobPayload) {
-    const newId = Date.now().toString();
-    const newJob: JobApplication = {
-      id: newId,
-      company: payload.company,
-      role: payload.role,
-      appliedDate: new Date().toISOString().split("T")[0],
-      url: payload.url,
-      status: payload.status,
-      notes: payload.notes,
-    };
+  async function handleAddJob(payload: NewJobPayload) {
+    const today = new Date().toISOString().split("T")[0];
+    const newId = crypto.randomUUID();
 
-    setJobs((prevJobs) => ({
-      ...prevJobs,
-      [newId]: newJob,
-    }));
+    try {
+      const { data, error } = await supabase
+        .from("applications")
+        .insert([
+          {
+            id: newId,
+            company: payload.company,
+            role: payload.role,
+            status: payload.status,
+            applied_date: today,
+            url: payload.url,
+            notes: payload.notes,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error creating application in Supabase:", error.message);
+        return;
+      }
+
+      if (data) {
+        const newJob: JobApplication = {
+          id: data.id,
+          company: data.company,
+          role: data.role,
+          status: data.status,
+          appliedDate: data.applied_date,
+          url: data.url || "#",
+          notes: data.notes || "",
+        };
+
+        setJobs((prevJobs) => ({
+          ...prevJobs,
+          [newJob.id]: newJob,
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to insert job into Supabase:", err);
+    }
   }
 
   function handleStatusChange(id: string, newStatus: ApplicationStatus) {
