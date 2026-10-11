@@ -40,7 +40,7 @@ export default function Home() {
           setJobs(map);
         }
       } catch (err) {
-        console.error("Failed to connect to Supabase:", err);
+        console.error("Failed to connect to database:", err);
       } finally {
         setIsLoading(false);
       }
@@ -77,7 +77,7 @@ export default function Home() {
         .single();
 
       if (error) {
-        console.error("Error creating application in Supabase:", error.message);
+        console.error("Error creating application in database:", error.message);
         return;
       }
 
@@ -98,7 +98,7 @@ export default function Home() {
         }));
       }
     } catch (err) {
-      console.error("Failed to insert job into Supabase:", err);
+      console.error("Failed to insert job into database:", err);
     }
   }
 
@@ -118,10 +118,10 @@ export default function Home() {
         .eq("id", id);
 
       if (error) {
-        console.error("Error updating status in Supabase:", error.message);
+        console.error("Error updating status in database:", error.message);
       }
     } catch (err) {
-      console.error("Failed to update status in Supabase:", err);
+      console.error("Failed to update status in database:", err);
     }
   }
 
@@ -149,10 +149,10 @@ export default function Home() {
         .eq("id", id);
 
       if (error) {
-        console.error("Error updating application in Supabase:", error.message);
+        console.error("Error updating application in database:", error.message);
       }
     } catch (err) {
-      console.error("Failed to update application in Supabase:", err);
+      console.error("Failed to update application in database:", err);
     }
   }
 
@@ -170,10 +170,10 @@ export default function Home() {
         .eq("id", id);
 
       if (error) {
-        console.error("Error deleting application in Supabase:", error.message);
+        console.error("Error deleting application in database:", error.message);
       }
     } catch (err) {
-      console.error("Failed to delete application from Supabase:", err);
+      console.error("Failed to delete application from database:", err);
     }
   }
 
@@ -203,10 +203,10 @@ export default function Home() {
         .insert(rowsToInsert);
 
       if (error) {
-        console.error("Error saving imported jobs to Supabase:", error.message);
+        console.error("Error saving imported jobs to database:", error.message);
       }
     } catch (err) {
-      console.error("Failed to insert imported jobs into Supabase:", err);
+      console.error("Failed to insert imported jobs into database:", err);
     }
   }
 
@@ -226,7 +226,7 @@ export default function Home() {
       {isLoading ? (
         <div className="p-12 text-center text-zinc-400">
           <div className="inline-block w-6 h-6 border-2 border-zinc-500 border-t-zinc-100 rounded-full animate-spin mb-3"></div>
-          <p className="text-sm">Connecting to cloud database...</p>
+          <p className="text-sm">Loading applications...</p>
         </div>
       ) : (
         <JobTable
