@@ -102,7 +102,7 @@ export default function Home() {
     }
   }
 
-  function handleStatusChange(id: string, newStatus: ApplicationStatus) {
+  async function handleStatusChange(id: string, newStatus: ApplicationStatus) {
     setJobs((prevJobs) => ({
       ...prevJobs,
       [id]: {
@@ -110,9 +110,22 @@ export default function Home() {
         status: newStatus,
       },
     }));
+
+    try {
+      const { error } = await supabase
+        .from("applications")
+        .update({ status: newStatus })
+        .eq("id", id);
+
+      if (error) {
+        console.error("Error updating status in Supabase:", error.message);
+      }
+    } catch (err) {
+      console.error("Failed to update status in Supabase:", err);
+    }
   }
 
-  function handleSaveEdit(id: string, updated: Partial<JobApplication>) {
+  async function handleSaveEdit(id: string, updated: Partial<JobApplication>) {
     setJobs((prevJobs) => ({
       ...prevJobs,
       [id]: {
@@ -120,6 +133,27 @@ export default function Home() {
         ...updated,
       },
     }));
+
+    try {
+      const dbPayload: Record<string, unknown> = {};
+      if (updated.company !== undefined) dbPayload.company = updated.company;
+      if (updated.role !== undefined) dbPayload.role = updated.role;
+      if (updated.status !== undefined) dbPayload.status = updated.status;
+      if (updated.appliedDate !== undefined) dbPayload.applied_date = updated.appliedDate;
+      if (updated.url !== undefined) dbPayload.url = updated.url;
+      if (updated.notes !== undefined) dbPayload.notes = updated.notes;
+
+      const { error } = await supabase
+        .from("applications")
+        .update(dbPayload)
+        .eq("id", id);
+
+      if (error) {
+        console.error("Error updating application in Supabase:", error.message);
+      }
+    } catch (err) {
+      console.error("Failed to update application in Supabase:", err);
+    }
   }
 
   function handleDeleteJob(id: string) {
