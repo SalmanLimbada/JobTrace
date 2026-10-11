@@ -177,11 +177,37 @@ export default function Home() {
     }
   }
 
-  function handleImportJobs(newJobsMap: Record<string, JobApplication>) {
+  async function handleImportJobs(newJobsMap: Record<string, JobApplication>) {
+    const jobArray = Object.values(newJobsMap);
+    if (jobArray.length === 0) return;
+
+    // Immediately update local state
     setJobs((prevJobs) => ({
       ...prevJobs,
       ...newJobsMap,
     }));
+
+    try {
+      const rowsToInsert = jobArray.map((job) => ({
+        id: job.id,
+        company: job.company,
+        role: job.role,
+        status: job.status,
+        applied_date: job.appliedDate,
+        url: job.url,
+        notes: job.notes,
+      }));
+
+      const { error } = await supabase
+        .from("applications")
+        .insert(rowsToInsert);
+
+      if (error) {
+        console.error("Error saving imported jobs to Supabase:", error.message);
+      }
+    } catch (err) {
+      console.error("Failed to insert imported jobs into Supabase:", err);
+    }
   }
 
   return (
