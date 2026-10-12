@@ -61,50 +61,50 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-zinc-100">
-            {isSignUp ? "Create an Account" : "Sign In"}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-sm rounded-xl border border-[#30363d] bg-[#161b22] p-6 shadow-xl">
+        <div className="flex items-center justify-between pb-4 border-b border-[#30363d] mb-5">
+          <h2 className="text-sm font-semibold text-[#f0f6fc]">
+            {isSignUp ? "Create your account" : "Sign in to Job Tracker"}
           </h2>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-100 p-1 rounded-md transition-colors"
-            aria-label="Close dialog"
+            className="text-[#8b949e] hover:text-[#f0f6fc] p-1 rounded-md text-xs transition-colors"
+            aria-label="Close"
           >
             ✕
           </button>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 rounded-lg bg-red-950/50 border border-red-800 p-3 text-sm text-red-200">
+          <div className="mb-4 rounded-md bg-[#f85149]/10 border border-[#f85149]/30 px-3 py-2 text-xs text-[#f85149]">
             {errorMsg}
           </div>
         )}
 
         {successMsg && (
-          <div className="mb-4 rounded-lg bg-emerald-950/50 border border-emerald-800 p-3 text-sm text-emerald-200">
+          <div className="mb-4 rounded-md bg-[#2ea043]/10 border border-[#2ea043]/30 px-3 py-2 text-xs text-[#3fb950]">
             {successMsg}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
-              Email Address
+            <label className="block text-xs font-medium text-[#c9d1d9] mb-1.5">
+              Email address
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder="you@domain.com"
               required
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-500 focus:outline-hidden"
+              className="w-full rounded-md border border-[#30363d] bg-[#0d1117] px-3 py-2 text-xs text-[#c9d1d9] placeholder-[#484f58] focus:border-[#58a6ff] focus:outline-none transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
+            <label className="block text-xs font-medium text-[#c9d1d9] mb-1.5">
               Password
             </label>
             <input
@@ -113,25 +113,25 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-500 focus:outline-hidden"
+              className="w-full rounded-md border border-[#30363d] bg-[#0d1117] px-3 py-2 text-xs text-[#c9d1d9] placeholder-[#484f58] focus:border-[#58a6ff] focus:outline-none transition-colors"
             />
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-2 w-full rounded-lg bg-zinc-100 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+            className="mt-2 w-full rounded-md bg-[#238636] hover:bg-[#2ea043] text-white py-2 text-xs font-medium border border-[#2ea043]/50 transition-colors disabled:opacity-50"
           >
             {isSubmitting
-              ? "Please wait..."
+              ? "Connecting..."
               : isSignUp
               ? "Create Account"
               : "Sign In"}
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-zinc-400">
-          {isSignUp ? "Already have an account? " : "Don't have an account? "}
+        <div className="mt-5 pt-4 border-t border-[#30363d] text-center text-xs text-[#8b949e]">
+          {isSignUp ? "Already have an account? " : "New user? "}
           <button
             type="button"
             onClick={() => {
@@ -139,9 +139,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               setErrorMsg("");
               setSuccessMsg("");
             }}
-            className="text-zinc-200 hover:underline font-medium"
+            className="text-[#58a6ff] hover:underline font-medium"
           >
-            {isSignUp ? "Sign In" : "Sign Up"}
+            {isSignUp ? "Sign In" : "Create an account"}
           </button>
         </div>
       </div>
