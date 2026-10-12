@@ -3,6 +3,7 @@
 
 create table if not exists applications (
   id text primary key,
+  user_id uuid references auth.users(id) on delete cascade,
   company text not null,
   role text not null,
   status text not null check (status in ('Applied', 'Interview', 'Offer', 'Rejected', 'Other')),
@@ -15,15 +16,27 @@ create table if not exists applications (
 -- Enable Row Level Security (RLS)
 alter table applications enable row level security;
 
--- Day 2 policies: Allow public access for anon client
-create policy "Allow public read access" on applications
-  for select using (true);
+-- Drop previous permissive policies if they exist
+drop policy if exists "Allow public read access" on applications;
+drop policy if exists "Allow public insert access" on applications;
+drop policy if exists "Allow public update access" on applications;
+drop policy if exists "Allow public delete access" on applications;
 
-create policy "Allow public insert access" on applications
-  for insert with check (true);
+-- Drop previous user policies if re-running
+drop policy if exists "Users can read own applications" on applications;
+drop policy if exists "Users can insert own applications" on applications;
+drop policy if exists "Users can update own applications" on applications;
+drop policy if exists "Users can delete own applications" on applications;
 
-create policy "Allow public update access" on applications
-  for update using (true);
+-- Strict user-scoped RLS policies
+create policy "Users can read own applications" on applications
+  for select using (auth.uid() = user_id);
 
-create policy "Allow public delete access" on applications
-  for delete using (true);
+create policy "Users can insert own applications" on applications
+  for insert with check (auth.uid() = user_id);
+
+create policy "Users can update own applications" on applications
+  for update using (auth.uid() = user_id);
+
+create policy "Users can delete own applications" on applications
+  for delete using (auth.uid() = user_id);
