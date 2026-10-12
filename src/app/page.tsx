@@ -45,7 +45,34 @@ export default function Home() {
       return;
     }
 
-    // Authenticated Mode: load from Supabase
+    // Authenticated Mode: check if guest jobs need migrating first
+    try {
+      const guestData = localStorage.getItem(GUEST_STORAGE_KEY);
+      if (guestData) {
+        const parsedGuest = JSON.parse(guestData) as Record<string, JobApplication>;
+        const guestList = Object.values(parsedGuest);
+
+        if (guestList.length > 0) {
+          const rowsToMigrate = guestList.map((job) => ({
+            id: job.id,
+            user_id: user.id,
+            company: job.company,
+            role: job.role,
+            status: job.status,
+            applied_date: job.appliedDate,
+            url: job.url,
+            notes: job.notes,
+          }));
+
+          await supabase.from("applications").insert(rowsToMigrate);
+          localStorage.removeItem(GUEST_STORAGE_KEY);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to migrate guest applications to account:", e);
+    }
+
+    // Load full applications list from Supabase
     try {
       const { data, error } = await supabase
         .from("applications")
@@ -276,7 +303,7 @@ export default function Home() {
       <Navbar />
 
       <main className="p-4 sm:p-8 max-w-5xl mx-auto w-full flex-1">
-        {/* Subtle Guest Mode Banner */}
+        {/* Guest Mode Banner */}
         {!user && !isAuthLoading && (
           <div className="mb-6 flex items-center justify-between gap-4 rounded-md border border-[#30363d] bg-[#161b22] px-4 py-2.5 text-xs text-[#8b949e]">
             <div className="flex items-center gap-2">
