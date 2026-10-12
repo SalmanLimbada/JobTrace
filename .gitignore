@@ -43,3 +43,6 @@ next-env.d.ts
 
 # agents 
 AGENTS.md
+
+# supabase cli cache
+supabase/.temp/

@@ -1,5 +1,4 @@
 -- Schema for Job Application Tracker
--- Run this in your Supabase project under: SQL Editor -> New query -> Run
 
 create table if not exists applications (
   id text primary key,
