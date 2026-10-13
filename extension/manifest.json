@@ -3,9 +3,19 @@
   "name": "JobTrace",
   "version": "1.0.0",
   "description": "Clip job applications directly into your JobTrace tracker with one click.",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "JobTrace Quick-Add"
+    "default_title": "JobTrace",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   },
   "permissions": [
     "activeTab",
