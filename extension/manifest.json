@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Job Tracker Quick-Add",
+  "version": "1.0.0",
+  "description": "Quickly clip and save job applications directly into your tracker.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Save to Job Tracker"
+  },
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.supabase.co/*"
+  ]
+}

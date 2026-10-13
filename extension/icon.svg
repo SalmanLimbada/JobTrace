@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" rx="28" fill="#161b22"/>
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="none" stroke="#30363d" stroke-width="6"/>
+  <!-- Briefcase icon -->
+  <path d="M40 44V34C40 30.7 42.7 28 46 28H82C85.3 28 88 30.7 88 34V44H100C104.4 44 108 47.6 108 52V92C108 96.4 104.4 100 100 100H28C23.6 100 20 96.4 20 92V52C20 47.6 23.6 44 28 44H40ZM48 44H80V36H48V44ZM28 52V62C30 63 60 72 64 72C68 72 98 63 100 62V52H28Z" fill="#238636"/>
+</svg>
