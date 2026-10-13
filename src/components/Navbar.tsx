@@ -63,18 +63,13 @@ export default function Navbar() {
                 stroke="#161b22"
                 strokeWidth="2"
               />
-              <rect
-                x="27.5"
-                y="36"
-                width="9"
-                height="9"
-                rx="2"
+              <path
+                d="M25 35 H39 C39.8 35 40.5 35.7 40.5 36.5 V38.5 C40.5 39.3 39.8 40 39 40 H34.5 V46.5 C34.5 47.3 33.8 48 33 48 H31 C30.2 48 29.5 47.3 29.5 46.5 V40 H25 C24.2 40 23.5 39.3 23.5 38.5 V36.5 C23.5 35.7 24.2 35 25 35 Z"
                 fill="#e0a030"
                 stroke="#161b22"
                 strokeWidth="2.5"
+                strokeLinejoin="round"
               />
-              <circle cx="32" cy="40.5" r="1.2" fill="#161b22" />
-              <rect x="31.4" y="40.5" width="1.2" height="2" fill="#161b22" />
             </svg>
             <span className="font-bold text-base text-[#f0f6fc] tracking-tight">
               JobTrace
