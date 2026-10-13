@@ -29,13 +29,19 @@ drop policy if exists "Users can delete own applications" on applications;
 
 -- Strict user-scoped RLS policies
 create policy "Users can read own applications" on applications
-  for select using (auth.uid() = user_id);
+  for select using (auth.uid() = user_id or user_id is null);
 
 create policy "Users can insert own applications" on applications
-  for insert with check (auth.uid() = user_id);
+  for insert with check (auth.uid() = user_id or user_id is null);
 
 create policy "Users can update own applications" on applications
-  for update using (auth.uid() = user_id);
+  for update using (auth.uid() = user_id or user_id is null);
 
 create policy "Users can delete own applications" on applications
-  for delete using (auth.uid() = user_id);
+  for delete using (auth.uid() = user_id or user_id is null);
+
+-- Allow extension / anon quick-add inserts
+drop policy if exists "Allow quick add insert" on applications;
+create policy "Allow quick add insert" on applications
+  for insert with check (true);
+
