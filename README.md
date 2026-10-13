@@ -1,10 +1,10 @@
-# Job Application Tracker
+# JobTrace
 
-A fast job tracker built because Google Sheets gets messy when you're applying to hundreds of jobs. 
+An active job tracker built because spreadsheets get messy when you're applying to hundreds of jobs. 
 
 Works immediately in your browser without signing up (saves locally), or you can create an account to sync across devices via Supabase. Includes a companion Chrome extension to save postings with one click from LinkedIn or Indeed.
 
-**Live site:** [my-applications-tracker.vercel.app](https://my-applications-tracker.vercel.app) (no signup required)
+**Live site:** [https://job-trace-web.vercel.app/](https://job-trace-web.vercel.app/) (no signup required)
 
 ## What it does
 

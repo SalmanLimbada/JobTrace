@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Job Tracker Quick-Add",
+  "name": "JobTrace",
   "version": "1.0.0",
-  "description": "Quickly clip and save job applications directly into your tracker.",
+  "description": "Clip job applications directly into your JobTrace tracker with one click.",
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Save to Job Tracker"
+    "default_title": "JobTrace Quick-Add"
   },
   "permissions": [
     "activeTab",
