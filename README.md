@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Job Application Tracker
 
-## Getting Started
+A fast job tracker built because Google Sheets gets messy when you're applying to hundreds of jobs. 
 
-First, run the development server:
+Works immediately in your browser without signing up (saves locally), or you can create an account to sync across devices via Supabase. Includes a companion Chrome extension to save postings with one click from LinkedIn or Indeed.
+
+**Live site:** [my-applications-tracker.vercel.app](https://my-applications-tracker.vercel.app) (no signup required)
+
+## What it does
+
+- **Track applications**: Keep tabs on company, role, date applied, link, and status (Applied, Interview, Offer, Rejected).
+- **Guest mode**: Start adding jobs right away without creating an account. Saves to your browser's local storage.
+- **Account sync**: Sign in with email to back up jobs to Supabase (PostgreSQL). Guest jobs migrate automatically when you log in.
+- **Chrome extension**: Click the extension icon on any job posting to auto-fill the title/URL and save it straight to your tracker.
+- **CSV import & export**: Backup your data or import hundreds of jobs from an existing spreadsheet.
+
+## Tech stack
+
+- Next.js + React
+- TypeScript + Tailwind CSS
+- Supabase (PostgreSQL + Auth)
+- Chrome Extension (Manifest V3)
+- Hosted on Vercel
+
+## Running locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/SalmanLimbada/job-application-tracker.git
+cd job-application-tracker
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create a `.env.local` file with your Supabase credentials:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Run the dev server:
 
-## Learn More
+```bash
+pnpm dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Run the schema in `supabase/schema.sql` inside your Supabase SQL editor if you're setting up a fresh database.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Loading the Chrome extension
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Go to `chrome://extensions` in Chrome.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and choose the `extension/` folder in this repo.
