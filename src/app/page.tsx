@@ -6,6 +6,7 @@ import JobForm, { type NewJobPayload } from "@/components/JobForm";
 import JobTable from "@/components/JobTable";
 import Navbar from "@/components/Navbar";
 import AuthModal from "@/components/AuthModal";
+import ScrollNav from "@/components/ScrollNav";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 
@@ -359,6 +360,8 @@ export default function Home() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
       />
+
+      <ScrollNav />
     </div>
   );
 }
