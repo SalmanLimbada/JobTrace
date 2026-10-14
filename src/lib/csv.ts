@@ -1,4 +1,4 @@
-import type { ApplicationStatus, JobApplication } from "@/types/job";
+import type { ApplicationStatus, CustomFieldDefinition, JobApplication } from "@/types/job";
 
 function escapeCSV(val: string): string {
   if (val.includes(",") || val.includes('"') || val.includes("\n")) {
@@ -31,17 +31,42 @@ export function parseCSVLine(line: string): string[] {
   return result;
 }
 
-export function exportApplicationsToCSV(jobs: JobApplication[]): void {
-  const headers = ["Company", "Role", "Status", "Date Applied", "Posting URL", "Notes"];
+export function exportApplicationsToCSV(
+  jobs: JobApplication[],
+  customFields?: CustomFieldDefinition[]
+): void {
+  const activeCustom = (customFields || []).filter((f) => f.enabled);
+  const headers = [
+    "Company",
+    "Role",
+    "Status",
+    "Date Applied",
+    ...activeCustom.map((f) => f.name),
+    "Posting URL",
+    "Notes",
+  ];
 
-  const rows = jobs.map((job) => [
-    escapeCSV(job.company),
-    escapeCSV(job.role),
-    escapeCSV(job.status),
-    escapeCSV(job.appliedDate),
-    escapeCSV(job.url),
-    escapeCSV(job.notes),
-  ]);
+  const rows = jobs.map((job) => {
+    const customValues = activeCustom.map((f) => {
+      let val = job.customFields?.[f.id];
+      if (val === undefined) {
+        if (f.id === "salary") val = job.salary;
+        else if (f.id === "location") val = job.location;
+        else if (f.id === "deadlineDate") val = job.deadlineDate;
+      }
+      return escapeCSV(val || "");
+    });
+
+    return [
+      escapeCSV(job.company),
+      escapeCSV(job.role),
+      escapeCSV(job.status),
+      escapeCSV(job.appliedDate),
+      ...customValues,
+      escapeCSV(job.url),
+      escapeCSV(job.notes),
+    ];
+  });
 
   const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -107,10 +132,13 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
   let dateIdx = findIndex(["dateapplied", "applieddate", "applicationdate", "date", "appliedon"]);
   let urlIdx = findIndex(["postingurl", "joburl", "url", "link", "joblink", "listing"]);
   let notesIdx = findIndex(["notes", "note", "comments", "comment", "description", "details"]);
+  let salaryIdx = findIndex(["salary", "compensation", "pay", "rate", "hourly", "annual"]);
+  let locationIdx = findIndex(["location", "city", "workplace", "remote", "mode"]);
+  let deadlineIdx = findIndex(["deadline", "deadlinedate", "due", "duedate", "nextround", "interviewdate"]);
 
   // If company or role wasn't matched by name, assign to the first unclaimed column
   if (companyIdx === -1) {
-    const claimed = new Set([roleIdx, statusIdx, dateIdx, urlIdx, notesIdx].filter((i) => i !== -1));
+    const claimed = new Set([roleIdx, statusIdx, dateIdx, urlIdx, notesIdx, salaryIdx, locationIdx, deadlineIdx].filter((i) => i !== -1));
     for (let i = 0; i < rawHeaders.length; i++) {
       if (!claimed.has(i)) {
         companyIdx = i;
@@ -121,7 +149,7 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
   }
 
   if (roleIdx === -1) {
-    const claimed = new Set([companyIdx, statusIdx, dateIdx, urlIdx, notesIdx].filter((i) => i !== -1));
+    const claimed = new Set([companyIdx, statusIdx, dateIdx, urlIdx, notesIdx, salaryIdx, locationIdx, deadlineIdx].filter((i) => i !== -1));
     for (let i = 0; i < rawHeaders.length; i++) {
       if (!claimed.has(i)) {
         roleIdx = i;
@@ -158,6 +186,16 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
         : `Column ${notesIdx + 1}`,
   };
 
+  // Claimed column indices
+  const claimed = new Set([companyIdx, roleIdx, statusIdx, dateIdx, urlIdx, notesIdx, salaryIdx, locationIdx, deadlineIdx].filter((i) => i !== -1));
+  const extraCols: { idx: number; key: string }[] = [];
+  rawHeaders.forEach((h, idx) => {
+    if (!claimed.has(idx) && h && String(h).trim().length > 0) {
+      const cleanKey = String(h).trim().toLowerCase().replace(/[^a-z0-9]/g, "_");
+      extraCols.push({ idx, key: cleanKey });
+    }
+  });
+
   const newJobsMap: Record<string, JobApplication> = {};
   const rows: JobApplication[] = [];
   let count = 0;
@@ -178,6 +216,20 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
     const appliedDate = dateIdx !== -1 ? normalizeDate(cols[dateIdx] || "") : new Date().toISOString().split("T")[0];
     const url = (urlIdx !== -1 ? cols[urlIdx] : "") || "#";
     const notes = (notesIdx !== -1 ? cols[notesIdx] : "") || "";
+    const salary = (salaryIdx !== -1 ? cols[salaryIdx] : "") || "";
+    const location = (locationIdx !== -1 ? cols[locationIdx] : "") || "";
+    const deadlineDate = (deadlineIdx !== -1 ? cols[deadlineIdx] : "") || "";
+
+    const customFields: Record<string, string> = {};
+    if (salary) customFields.salary = salary;
+    if (location) customFields.location = location;
+    if (deadlineDate) customFields.deadlineDate = deadlineDate;
+    for (const ec of extraCols) {
+      const val = cols[ec.idx]?.trim();
+      if (val) {
+        customFields[ec.key] = val;
+      }
+    }
 
     const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${count}`;
     const job: JobApplication = {
@@ -188,6 +240,10 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
       appliedDate,
       url: url.startsWith("http") || url === "#" ? url : `https://${url}`,
       notes,
+      salary: salary || undefined,
+      location: location || undefined,
+      deadlineDate: deadlineDate || undefined,
+      customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
     };
 
     newJobsMap[id] = job;
