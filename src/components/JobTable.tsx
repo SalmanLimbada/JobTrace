@@ -46,7 +46,7 @@ export default function JobTable({
   onDeleteJob,
   onImportJobs,
 }: JobTableProps) {
-  const { customFields } = useSettings();
+  const { customFields, standardColumns, showRowNumbers } = useSettings();
   const activeFields = customFields.filter((f) => f.enabled);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,6 +63,11 @@ export default function JobTable({
       job.role.toLowerCase().includes(query);
     return matchesStatus && matchesSearch;
   });
+
+  const visibleStandardCount = (
+    Object.values(standardColumns) as boolean[]
+  ).filter(Boolean).length;
+  const totalColumnCount = 1 + visibleStandardCount + activeFields.length;
 
   return (
     <div>
@@ -128,25 +133,27 @@ export default function JobTable({
         <table className="w-full text-left">
           <thead className="bg-zinc-900/90 text-zinc-400 text-xs uppercase font-medium border-b border-zinc-800">
             <tr>
-              <th className="w-8 p-0"></th>
-              <th className="p-3.5">Company</th>
-              <th className="p-3.5">Role</th>
-              <th className="p-3.5">Status</th>
-              <th className="p-3.5">Date Applied</th>
+              <th className={`${showRowNumbers ? "w-10 px-2" : "w-8 p-0"} text-center font-mono text-[11px]`}>
+                {showRowNumbers ? "#" : ""}
+              </th>
+              {standardColumns.company && <th className="p-3.5">Company</th>}
+              {standardColumns.role && <th className="p-3.5">Role</th>}
+              {standardColumns.status && <th className="p-3.5">Status</th>}
+              {standardColumns.appliedDate && <th className="p-3.5">Date Applied</th>}
               {activeFields.map((f) => (
                 <th key={f.id} className="p-3.5 whitespace-nowrap">
                   {f.name}
                 </th>
               ))}
-              <th className="p-3.5">Posting URL</th>
-              <th className="p-3.5">Notes</th>
+              {standardColumns.url && <th className="p-3.5">Posting URL</th>}
+              {standardColumns.notes && <th className="p-3.5">Notes</th>}
             </tr>
           </thead>
           <tbody>
             {filteredJobs.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7 + activeFields.length}
+                  colSpan={totalColumnCount}
                   className="p-8 text-center text-zinc-500 text-sm"
                 >
                   No job applications found matching your criteria.
@@ -165,18 +172,25 @@ export default function JobTable({
                 </td>
               </tr>
             ) : (
-              filteredJobs.map((job) => (
+              filteredJobs.map((job, index) => (
                 <tr
                   key={job.id}
                   className="group border-b border-zinc-800/80 hover:bg-zinc-800/30 transition-colors"
                 >
-                  {/* Left-edge Hover Slide-Out Pencil */}
-                  <td className="w-8 p-0 text-center relative">
+                  {/* Left-edge: Row Number / Hover Slide-Out Pencil */}
+                  <td className={`${showRowNumbers ? "w-10 px-2" : "w-8 p-0"} text-center relative select-none`}>
+                    {showRowNumbers && (
+                      <span className="font-mono text-[11px] text-[#8b949e] transition-opacity duration-150 group-hover:opacity-0 block">
+                        {index + 1}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => setEditingJob(job)}
                       title="Edit application"
-                      className="opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 text-zinc-400 hover:text-[#58a6ff] p-1.5 rounded hover:bg-zinc-800 cursor-pointer inline-flex items-center justify-center"
+                      className={`opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 text-zinc-400 hover:text-[#58a6ff] p-1.5 rounded hover:bg-zinc-800 cursor-pointer inline-flex items-center justify-center ${
+                        showRowNumbers ? "absolute inset-0 m-auto w-6 h-6" : ""
+                      }`}
                     >
                       <svg
                         className="w-3.5 h-3.5"
@@ -194,22 +208,30 @@ export default function JobTable({
                     </button>
                   </td>
 
-                  <td className="p-3 font-medium text-zinc-100">{job.company}</td>
-                  <td className="p-3 text-zinc-300">{job.role}</td>
-                  <td className="p-3">
-                    <select
-                      value={job.status}
-                      onChange={(e) => onStatusChange(job.id, e.target.value as ApplicationStatus)}
-                      className="bg-zinc-800 text-zinc-200 text-xs px-2.5 py-1 rounded border border-zinc-700 outline-none cursor-pointer hover:border-zinc-500 transition-colors"
-                    >
-                      <option value="Applied">Applied</option>
-                      <option value="Interview">Interview</option>
-                      <option value="Offer">Offer</option>
-                      <option value="Rejected">Rejected</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </td>
-                  <td className="p-3 text-zinc-400 text-xs">{job.appliedDate}</td>
+                  {standardColumns.company && (
+                    <td className="p-3 font-medium text-zinc-100">{job.company}</td>
+                  )}
+                  {standardColumns.role && (
+                    <td className="p-3 text-zinc-300">{job.role}</td>
+                  )}
+                  {standardColumns.status && (
+                    <td className="p-3">
+                      <select
+                        value={job.status}
+                        onChange={(e) => onStatusChange(job.id, e.target.value as ApplicationStatus)}
+                        className="bg-zinc-800 text-zinc-200 text-xs px-2.5 py-1 rounded border border-zinc-700 outline-none cursor-pointer hover:border-zinc-500 transition-colors"
+                      >
+                        <option value="Applied">Applied</option>
+                        <option value="Interview">Interview</option>
+                        <option value="Offer">Offer</option>
+                        <option value="Rejected">Rejected</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </td>
+                  )}
+                  {standardColumns.appliedDate && (
+                    <td className="p-3 text-zinc-400 text-xs">{job.appliedDate}</td>
+                  )}
                   {activeFields.map((f) => {
                     const val = getFieldValue(job, f.id);
                     return (
@@ -223,26 +245,30 @@ export default function JobTable({
                       </td>
                     );
                   })}
-                  <td className="p-3">
-                    {(() => {
-                      const validUrl = formatUrl(job.url);
-                      return validUrl ? (
-                        <a
-                          href={validUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-400 hover:text-blue-300 hover:underline text-xs inline-flex items-center gap-1 font-medium"
-                        >
-                          View Post ↗
-                        </a>
-                      ) : (
-                        <span className="text-zinc-600 text-xs font-mono">—</span>
-                      );
-                    })()}
-                  </td>
-                  <td className="p-3 text-zinc-400 text-xs max-w-xs truncate" title={job.notes}>
-                    {job.notes || <span className="text-zinc-600">—</span>}
-                  </td>
+                  {standardColumns.url && (
+                    <td className="p-3">
+                      {(() => {
+                        const validUrl = formatUrl(job.url);
+                        return validUrl ? (
+                          <a
+                            href={validUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:text-blue-300 hover:underline text-xs inline-flex items-center gap-1 font-medium"
+                          >
+                            View Post ↗
+                          </a>
+                        ) : (
+                          <span className="text-zinc-600 text-xs font-mono">—</span>
+                        );
+                      })()}
+                    </td>
+                  )}
+                  {standardColumns.notes && (
+                    <td className="p-3 text-zinc-400 text-xs max-w-xs truncate" title={job.notes}>
+                      {job.notes || <span className="text-zinc-600">—</span>}
+                    </td>
+                  )}
                 </tr>
               ))
             )}

@@ -4,7 +4,8 @@ import { useEffect, useState, FormEvent } from "react";
 import {
   useSettings,
   SUGGESTED_FIELDS,
-  type AppTheme,
+  STANDARD_COLUMN_NAMES,
+  type StandardColumnsSettings,
 } from "@/context/SettingsContext";
 import type { CustomFieldType } from "@/types/job";
 
@@ -17,6 +18,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const {
     theme,
     setTheme,
+    standardColumns,
+    toggleStandardColumn,
+    showRowNumbers,
+    toggleShowRowNumbers,
     customFields,
     addCustomField,
     removeCustomField,
@@ -45,6 +50,15 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setNewFieldType("text");
   }
 
+  const standardColumnKeys: (keyof StandardColumnsSettings)[] = [
+    "company",
+    "role",
+    "status",
+    "appliedDate",
+    "url",
+    "notes",
+  ];
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
@@ -52,7 +66,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-xl rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+      <div className="w-full max-w-xl rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl flex flex-col overflow-hidden max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#30363d]">
           <div className="flex items-center gap-2.5">
@@ -79,13 +93,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 Settings & Preferences
               </h2>
               <p className="text-xs text-[#8b949e]">
-                Customize your appearance and custom tracking columns
+                Display preferences and tracking columns
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-[#8b949e] hover:text-[#f0f6fc] p-1.5 rounded-md text-xs transition-colors"
+            className="text-[#8b949e] hover:text-[#f0f6fc] p-1.5 rounded-md text-xs transition-colors cursor-pointer"
             aria-label="Close"
           >
             ✕
@@ -94,74 +108,134 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-6 text-xs">
-          {/* Appearance Section */}
+          {/* Section 1: iOS-Style Glassy Appearance Switcher */}
           <div>
-            <h3 className="text-xs font-semibold text-[#f0f6fc] uppercase tracking-wider mb-2.5">
+            <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block mb-2.5">
               Appearance
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
+            </span>
+            <div className="theme-slider-track relative flex items-center bg-[#0d1117] p-1 rounded-full border border-[#30363d] w-24 h-8 shadow-inner">
+              {/* Sliding Frosted Glass Thumb */}
+              <div
+                className={`theme-slider-thumb absolute top-1 bottom-1 left-1 w-[40px] rounded-full bg-white/15 backdrop-blur-md border border-white/20 shadow-sm transition-transform duration-200 ease-out ${
+                  theme === "light" ? "translate-x-[46px]" : "translate-x-0"
+                }`}
+              />
               <button
                 type="button"
                 onClick={() => setTheme("dark")}
-                className={`p-3.5 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
-                  theme === "dark"
-                    ? "border-[#58a6ff] bg-[#58a6ff]/10 ring-1 ring-[#58a6ff]"
-                    : "border-[#30363d] bg-[#0d1117] hover:border-[#8b949e] hover:bg-[#21262d]"
+                title="Dark mode"
+                aria-label="Dark mode"
+                className={`relative z-10 w-1/2 h-full flex items-center justify-center transition-colors cursor-pointer ${
+                  theme === "dark" ? "text-amber-300" : "text-[#8b949e] hover:text-[#c9d1d9]"
                 }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base">🌙</span>
-                  <div>
-                    <span className="font-semibold text-[#f0f6fc] text-xs block">
-                      Dark Mode
-                    </span>
-                    <span className="text-[11px] text-[#8b949e]">
-                      Developer slate & midnight contrast
-                    </span>
-                  </div>
-                </div>
-                {theme === "dark" && (
-                  <span className="text-xs text-[#58a6ff] font-bold">✓</span>
-                )}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
               </button>
-
               <button
                 type="button"
                 onClick={() => setTheme("light")}
-                className={`p-3.5 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
-                  theme === "light"
-                    ? "border-[#0969da] bg-[#0969da]/10 ring-1 ring-[#0969da]"
-                    : "border-[#30363d] bg-[#0d1117] hover:border-[#8b949e] hover:bg-[#21262d]"
+                title="Light mode"
+                aria-label="Light mode"
+                className={`relative z-10 w-1/2 h-full flex items-center justify-center transition-colors cursor-pointer ${
+                  theme === "light" ? "text-amber-500" : "text-[#8b949e] hover:text-[#c9d1d9]"
                 }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base">☀️</span>
-                  <div>
-                    <span className="font-semibold text-[#f0f6fc] text-xs block">
-                      Light Mode
-                    </span>
-                    <span className="text-[11px] text-[#8b949e]">
-                      Clean high-contrast daylight
-                    </span>
-                  </div>
-                </div>
-                {theme === "light" && (
-                  <span className="text-xs text-[#0969da] font-bold">✓</span>
-                )}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
               </button>
             </div>
           </div>
 
           <div className="border-t border-[#30363d]/60" />
 
-          {/* Custom Columns & Fields Section */}
+          {/* Section 2: Table Display Preferences (Row Numbers) */}
+          <div>
+            <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block mb-2.5">
+              Table Preferences
+            </span>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-[#30363d] bg-[#0d1117]">
+              <div>
+                <span className="font-medium text-[#f0f6fc] block">
+                  Show Row Numbers (#)
+                </span>
+                <span className="text-[11px] text-[#8b949e]">
+                  Display row index column on the left edge
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleShowRowNumbers}
+                role="switch"
+                aria-checked={showRowNumbers}
+                className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                  showRowNumbers ? "bg-[#238636]" : "bg-[#30363d]"
+                }`}
+              >
+                <span
+                  className={`block w-4 h-4 rounded-full bg-white transition-transform ${
+                    showRowNumbers ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-[#30363d]/60" />
+
+          {/* Section 3: Standard Columns Visibility */}
+          <div className="space-y-2.5">
+            <div>
+              <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
+                Standard Columns
+              </span>
+              <span className="text-[11px] text-[#8b949e]">
+                Choose which default columns appear in your tracker table.
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {standardColumnKeys.map((colKey) => {
+                const isEnabled = standardColumns[colKey];
+                return (
+                  <button
+                    key={colKey}
+                    type="button"
+                    onClick={() => toggleStandardColumn(colKey)}
+                    className={`p-2.5 rounded-lg border text-left transition-colors flex items-center justify-between cursor-pointer ${
+                      isEnabled
+                        ? "border-[#58a6ff]/60 bg-[#58a6ff]/10 text-[#f0f6fc]"
+                        : "border-[#30363d] bg-[#0d1117] text-[#8b949e] hover:border-[#8b949e]"
+                    }`}
+                  >
+                    <span className="font-medium text-xs">
+                      {STANDARD_COLUMN_NAMES[colKey]}
+                    </span>
+                    <span
+                      className={`text-xs font-bold ${
+                        isEnabled ? "text-[#58a6ff]" : "text-[#8b949e] opacity-40"
+                      }`}
+                    >
+                      {isEnabled ? "✓" : "—"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-t border-[#30363d]/60" />
+
+          {/* Section 4: Custom Tracking Fields */}
           <div className="space-y-4">
             <div>
-              <h3 className="text-xs font-semibold text-[#f0f6fc] uppercase tracking-wider mb-1">
+              <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
                 Custom Tracking Fields
-              </h3>
+              </span>
               <p className="text-[#8b949e] text-[11px]">
-                Create your own fields (e.g. Recruiter, Tech Stack) or enable suggestions below.
+                Create your own fields (e.g. Recruiter, Priority, OA Link) or add suggestions below.
               </p>
             </div>
 
@@ -194,17 +268,17 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </div>
             </div>
 
-            {/* User Custom Field Creator */}
+            {/* Custom Field Creator Form */}
             <form
               onSubmit={handleCreateField}
               className="flex flex-wrap sm:flex-nowrap gap-2 items-center bg-[#0d1117] p-2.5 rounded-lg border border-[#30363d]"
             >
               <input
                 type="text"
-                placeholder="New field name (e.g. Recruiter, Priority, OA Link)"
+                placeholder="Field name (e.g. Recruiter, OA Link)"
                 value={newFieldName}
                 onChange={(e) => setNewFieldName(e.target.value)}
-                className="flex-1 bg-[#161b22] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded px-2.5 py-1.5 outline-none focus:border-[#58a6ff] min-w-[180px]"
+                className="flex-1 bg-[#161b22] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded px-2.5 py-1.5 outline-none focus:border-[#58a6ff] min-w-[160px]"
               />
               <select
                 value={newFieldType}
@@ -224,15 +298,15 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     : "bg-[#238636] hover:bg-[#2ea043] text-white cursor-pointer"
                 }`}
               >
-                + Create Field
+                + Create
               </button>
             </form>
 
-            {/* List of Active Custom Fields */}
+            {/* Active Custom Fields List */}
             {customFields.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <span className="text-[11px] font-medium text-[#8b949e] block">
-                  Your Active Fields ({customFields.length}):
+                  Active Custom Fields ({customFields.length}):
                 </span>
                 <div className="space-y-1.5">
                   {customFields.map((field) => (
@@ -250,7 +324,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       </div>
 
                       <div className="flex items-center gap-3">
-                        {/* Toggle */}
                         <button
                           type="button"
                           onClick={() => toggleCustomField(field.id)}
@@ -267,7 +340,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           />
                         </button>
 
-                        {/* Delete Field */}
                         <button
                           type="button"
                           onClick={() => removeCustomField(field.id)}
@@ -282,8 +354,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
               </div>
             ) : (
-              <p className="text-center py-3 text-xs text-[#8b949e] bg-[#0d1117] rounded-lg border border-[#30363d]/60">
-                No custom fields added yet. Use the suggestions above or type your own!
+              <p className="text-center py-2.5 text-xs text-[#8b949e] bg-[#0d1117] rounded-lg border border-[#30363d]/60">
+                No custom fields added yet.
               </p>
             )}
           </div>
@@ -294,7 +366,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="text-xs font-medium text-white bg-[#238636] hover:bg-[#2ea043] px-4 py-2 rounded-md transition-colors cursor-pointer"
+            className="text-xs font-medium text-white bg-[#238636] hover:bg-[#2ea043] px-4 py-2 rounded-md transition-colors cursor-pointer shadow-xs"
           >
             Done
           </button>

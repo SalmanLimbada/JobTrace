@@ -5,6 +5,33 @@ import type { CustomFieldDefinition, CustomFieldType } from "@/types/job";
 
 export type AppTheme = "dark" | "light";
 
+export interface StandardColumnsSettings {
+  company: boolean;
+  role: boolean;
+  status: boolean;
+  appliedDate: boolean;
+  url: boolean;
+  notes: boolean;
+}
+
+export const DEFAULT_STANDARD_COLUMNS: StandardColumnsSettings = {
+  company: true,
+  role: true,
+  status: true,
+  appliedDate: true,
+  url: true,
+  notes: true,
+};
+
+export const STANDARD_COLUMN_NAMES: Record<keyof StandardColumnsSettings, string> = {
+  company: "Company",
+  role: "Role",
+  status: "Status",
+  appliedDate: "Date Applied",
+  url: "Posting URL",
+  notes: "Notes",
+};
+
 export const SUGGESTED_FIELDS: Omit<CustomFieldDefinition, "enabled">[] = [
   { id: "salary", name: "Salary", type: "text" },
   { id: "location", name: "Location", type: "text" },
@@ -30,6 +57,11 @@ interface SettingsContextType {
   theme: AppTheme;
   setTheme: (theme: AppTheme) => void;
   toggleTheme: () => void;
+  standardColumns: StandardColumnsSettings;
+  toggleStandardColumn: (key: keyof StandardColumnsSettings) => void;
+  showRowNumbers: boolean;
+  setShowRowNumbers: (show: boolean) => void;
+  toggleShowRowNumbers: () => void;
   customFields: CustomFieldDefinition[];
   addCustomField: (name: string, type?: CustomFieldType) => void;
   removeCustomField: (id: string) => void;
@@ -42,23 +74,43 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 const STORAGE_THEME_KEY = "jobtrace_theme";
 const STORAGE_FIELDS_KEY = "jobtrace_custom_fields_v2";
+const STORAGE_STANDARD_COLS_KEY = "jobtrace_standard_columns";
+const STORAGE_ROW_NUMBERS_KEY = "jobtrace_row_numbers";
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<AppTheme>("dark");
   const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(DEFAULT_FIELDS);
+  const [standardColumns, setStandardColumns] = useState<StandardColumnsSettings>(DEFAULT_STANDARD_COLUMNS);
+  const [showRowNumbers, setShowRowNumbersState] = useState<boolean>(true);
 
   useEffect(() => {
     try {
+      // Theme
       const savedTheme = localStorage.getItem(STORAGE_THEME_KEY);
       const activeTheme: AppTheme = savedTheme === "light" ? "light" : "dark";
       setThemeState(activeTheme);
       document.documentElement.setAttribute("data-theme", activeTheme);
 
+      // Standard Columns
+      const savedStandardCols = localStorage.getItem(STORAGE_STANDARD_COLS_KEY);
+      if (savedStandardCols) {
+        setStandardColumns({
+          ...DEFAULT_STANDARD_COLUMNS,
+          ...JSON.parse(savedStandardCols),
+        });
+      }
+
+      // Row Numbers
+      const savedRowNumbers = localStorage.getItem(STORAGE_ROW_NUMBERS_KEY);
+      if (savedRowNumbers !== null) {
+        setShowRowNumbersState(savedRowNumbers === "true");
+      }
+
+      // Custom Fields
       const savedFields = localStorage.getItem(STORAGE_FIELDS_KEY);
       if (savedFields) {
         setCustomFields(JSON.parse(savedFields));
       } else {
-        // Check if old jobtrace_columns exists for migration
         const oldCols = localStorage.getItem("jobtrace_columns");
         if (oldCols) {
           try {
@@ -95,6 +147,28 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setTheme(next);
   };
 
+  const setShowRowNumbers = (show: boolean) => {
+    setShowRowNumbersState(show);
+    try {
+      localStorage.setItem(STORAGE_ROW_NUMBERS_KEY, String(show));
+    } catch {}
+  };
+
+  const toggleShowRowNumbers = () => {
+    setShowRowNumbers(!showRowNumbers);
+  };
+
+  const toggleStandardColumn = (key: keyof StandardColumnsSettings) => {
+    const updated = {
+      ...standardColumns,
+      [key]: !standardColumns[key],
+    };
+    setStandardColumns(updated);
+    try {
+      localStorage.setItem(STORAGE_STANDARD_COLS_KEY, JSON.stringify(updated));
+    } catch {}
+  };
+
   const saveFields = (fields: CustomFieldDefinition[]) => {
     setCustomFields(fields);
     try {
@@ -110,7 +184,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     // Prevent duplicates
     if (customFields.some((f) => f.id === id || f.name.toLowerCase() === trimmed.toLowerCase())) {
-      // If exists, make sure it's enabled
       saveFields(
         customFields.map((f) => (f.id === id ? { ...f, enabled: true } : f))
       );
@@ -151,7 +224,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (exists) {
       toggleCustomField(columnId);
     } else {
-      // Add suggested field
       const suggestion = SUGGESTED_FIELDS.find((s) => s.id === columnId);
       if (suggestion) {
         addCustomField(suggestion.name, suggestion.type);
@@ -167,6 +239,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         theme,
         setTheme,
         toggleTheme,
+        standardColumns,
+        toggleStandardColumn,
+        showRowNumbers,
+        setShowRowNumbers,
+        toggleShowRowNumbers,
         customFields,
         addCustomField,
         removeCustomField,

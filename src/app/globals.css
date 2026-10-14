@@ -57,6 +57,17 @@ html[data-theme="light"] .bg-zinc-800 {
   color: #1f2328 !important;
 }
 
+html[data-theme="light"] .theme-slider-track {
+  background-color: #eaeef2 !important;
+  border-color: #d0d7de !important;
+}
+
+html[data-theme="light"] .theme-slider-thumb {
+  background-color: #ffffff !important;
+  border-color: #d0d7de !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+}
+
 html[data-theme="light"] .hover\:bg-zinc-800:hover,
 html[data-theme="light"] .hover\:bg-\[\#30363d\]:hover {
   background-color: #e1e4e8 !important;
