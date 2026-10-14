@@ -11,7 +11,6 @@ export interface StandardColumnsSettings {
   status: boolean;
   appliedDate: boolean;
   url: boolean;
-  notes: boolean;
 }
 
 export const DEFAULT_STANDARD_COLUMNS: StandardColumnsSettings = {
@@ -20,7 +19,6 @@ export const DEFAULT_STANDARD_COLUMNS: StandardColumnsSettings = {
   status: true,
   appliedDate: true,
   url: true,
-  notes: true,
 };
 
 export const STANDARD_COLUMN_NAMES: Record<keyof StandardColumnsSettings, string> = {
@@ -29,7 +27,6 @@ export const STANDARD_COLUMN_NAMES: Record<keyof StandardColumnsSettings, string
   status: "Status",
   appliedDate: "Date Applied",
   url: "Posting URL",
-  notes: "Notes",
 };
 
 export interface ShortcutSettings {
@@ -63,6 +60,7 @@ export const SUGGESTED_STATUSES: string[] = [
 ];
 
 export const SUGGESTED_FIELDS: Omit<CustomFieldDefinition, "enabled">[] = [
+  { id: "notes", name: "Notes", type: "text" },
   { id: "salary", name: "Salary", type: "text" },
   { id: "location", name: "Location", type: "text" },
   { id: "deadlineDate", name: "Next Round / Deadline", type: "date" },
@@ -76,7 +74,7 @@ export const DEFAULT_FIELDS: CustomFieldDefinition[] = [
   { id: "deadlineDate", name: "Next Round / Deadline", type: "date", enabled: false },
 ];
 
-export const BASE_COLUMN_ORDER = ["company", "role", "status", "appliedDate", "salary", "location", "deadlineDate", "url", "notes"];
+export const BASE_COLUMN_ORDER = ["company", "role", "status", "appliedDate", "salary", "location", "deadlineDate", "url"];
 
 export interface ColumnSettings {
   salary: boolean;
@@ -208,8 +206,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const savedOrder = localStorage.getItem(STORAGE_COLUMN_ORDER_KEY);
       if (savedOrder) {
         const parsed = JSON.parse(savedOrder) as string[];
-        // Ensure any new custom field is included
-        const full = [...parsed];
+        // Ensure any new custom field is included and deprecated columns like notes are excluded
+        const full = parsed.filter((c) => c !== "notes");
         loadedFields.forEach((f) => {
           if (!full.includes(f.id)) full.push(f.id);
         });

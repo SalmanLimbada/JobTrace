@@ -40,6 +40,7 @@ function getFieldValue(job: JobApplication, fieldId: string): string | undefined
   if (fieldId === "salary") return job.salary;
   if (fieldId === "location") return job.location;
   if (fieldId === "deadlineDate") return job.deadlineDate;
+  if (fieldId === "notes") return job.notes;
   return undefined;
 }
 
@@ -271,9 +272,6 @@ export default function JobTable({
     } else if (sortColumn === "url") {
       valA = a.url || "";
       valB = b.url || "";
-    } else if (sortColumn === "notes") {
-      valA = a.notes || "";
-      valB = b.notes || "";
     } else {
       valA = getFieldValue(a, sortColumn) || "";
       valB = getFieldValue(b, sortColumn) || "";
@@ -338,12 +336,6 @@ export default function JobTable({
           </td>
         );
       }
-      case "notes":
-        return (
-          <td key={colId} className="p-3 text-zinc-400 text-xs max-w-xs truncate" title={job.notes}>
-            {job.notes || <span className="text-zinc-600">—</span>}
-          </td>
-        );
       default: {
         const customField = customFields.find((f) => f.id === colId);
         const val = getFieldValue(job, colId);
@@ -351,8 +343,13 @@ export default function JobTable({
           <td
             key={colId}
             className={`p-3 text-xs ${
-              customField?.type === "date" ? "text-zinc-400 font-mono" : "text-zinc-300"
+              colId === "notes"
+                ? "text-zinc-400 max-w-xs truncate"
+                : customField?.type === "date"
+                ? "text-zinc-400 font-mono"
+                : "text-zinc-300"
             }`}
+            title={colId === "notes" ? val : undefined}
           >
             {val || <span className="text-zinc-600">—</span>}
           </td>

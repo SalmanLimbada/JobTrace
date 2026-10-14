@@ -20,7 +20,7 @@ export default function EditJobModal({
   onDelete,
 }: EditJobModalProps) {
   const { customFields, statuses } = useSettings();
-  const activeCustomFields = customFields.filter((f) => f.enabled);
+  const activeCustomFields = customFields.filter((f) => f.enabled && f.id !== "notes");
 
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");

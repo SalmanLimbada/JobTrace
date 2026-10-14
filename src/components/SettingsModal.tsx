@@ -84,7 +84,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     "status",
     "appliedDate",
     "url",
-    "notes",
   ];
 
   return (
@@ -108,14 +107,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-            <div>
-              <h2 className="text-sm font-semibold text-[#f0f6fc]">
-                Settings
-              </h2>
-              <p className="text-[11px] text-[#8b949e]">
-                Preferences, statuses, columns, and shortcuts
-              </p>
-            </div>
+            <h2 className="text-sm font-semibold text-[#f0f6fc]">
+              Settings
+            </h2>
           </div>
           <button
             type="button"
@@ -128,11 +122,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center px-6 border-b border-[#30363d] bg-[#0d1117] gap-2 overflow-x-auto">
+        <div className="flex items-center px-6 border-b border-[#30363d] bg-[#0d1117] gap-3 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab("general")}
-            className={`px-3 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-4 py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === "general"
                 ? "border-[#58a6ff] text-[#f0f6fc]"
                 : "border-transparent text-[#8b949e] hover:text-[#c9d1d9]"
@@ -143,35 +137,35 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <button
             type="button"
             onClick={() => setActiveTab("statuses")}
-            className={`px-3 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-4 py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === "statuses"
                 ? "border-[#58a6ff] text-[#f0f6fc]"
                 : "border-transparent text-[#8b949e] hover:text-[#c9d1d9]"
             }`}
           >
             <span>Statuses</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[#21262d] text-[#8b949e]">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[#21262d] text-[#8b949e]">
               {statuses.length}
             </span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("columns")}
-            className={`px-3 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-4 py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === "columns"
                 ? "border-[#58a6ff] text-[#f0f6fc]"
                 : "border-transparent text-[#8b949e] hover:text-[#c9d1d9]"
             }`}
           >
             <span>Columns</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[#21262d] text-[#8b949e]">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[#21262d] text-[#8b949e]">
               {customFields.filter((f) => f.enabled).length}
             </span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("shortcuts")}
-            className={`px-3 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-4 py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === "shortcuts"
                 ? "border-[#58a6ff] text-[#f0f6fc]"
                 : "border-transparent text-[#8b949e] hover:text-[#c9d1d9]"
@@ -238,9 +232,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <span className="font-medium text-[#f0f6fc] block">
                       Show Row Numbers (#)
                     </span>
-                    <span className="text-[11px] text-[#8b949e]">
-                      Display line index column on the left edge with hover slide-out edit
-                    </span>
                   </div>
                   <button
                     type="button"
@@ -266,14 +257,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           {activeTab === "statuses" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
-                    Pipeline Statuses
-                  </span>
-                  <p className="text-[#8b949e] text-[11px]">
-                    Drag the 6-dot grip handle to reorder. The top 4 appear as main toolbar pills, others in &quot;More ▾&quot;.
-                  </p>
-                </div>
+                <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
+                  Pipeline Statuses
+                </span>
                 <button
                   type="button"
                   onClick={resetStatuses}
@@ -446,14 +432,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <div className="space-y-6">
               {/* Standard Columns Visibility */}
               <div className="space-y-2.5">
-                <div>
-                  <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
-                    Standard Columns
-                  </span>
-                  <span className="text-[11px] text-[#8b949e]">
-                    Choose which default columns appear in your tracker table.
-                  </span>
-                </div>
+                <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
+                  Standard Columns
+                </span>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {standardColumnKeys.map((colKey) => {
@@ -489,14 +470,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
               {/* Custom Tracking Fields */}
               <div className="space-y-4">
-                <div>
-                  <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
-                    Custom Tracking Fields
-                  </span>
-                  <p className="text-[#8b949e] text-[11px]">
-                    Create custom data fields (e.g. Recruiter, OA Link, Priority).
-                  </p>
-                </div>
+                <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
+                  Custom Tracking Fields
+                </span>
 
                 {/* Suggested One-Click Fields */}
                 <div>
@@ -625,14 +601,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           {activeTab === "shortcuts" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
-                    Keyboard Shortcuts
-                  </span>
-                  <span className="text-[11px] text-[#8b949e]">
-                    Quick navigation and actions (click a key badge to rebind)
-                  </span>
-                </div>
+                <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
+                  Keyboard Shortcuts
+                </span>
                 <button
                   type="button"
                   onClick={resetShortcuts}

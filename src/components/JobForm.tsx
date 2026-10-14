@@ -21,7 +21,7 @@ interface JobFormProps {
 
 export default function JobForm({ onAddJob }: JobFormProps) {
   const { customFields, statuses } = useSettings();
-  const activeFields = customFields.filter((f) => f.enabled);
+  const activeFields = customFields.filter((f) => f.enabled && f.id !== "notes");
 
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
