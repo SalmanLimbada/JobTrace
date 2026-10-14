@@ -154,9 +154,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       // Standard Columns
       const savedStandardCols = localStorage.getItem(STORAGE_STANDARD_COLS_KEY);
       if (savedStandardCols) {
+        const parsed = JSON.parse(savedStandardCols);
+        if ("notes" in parsed) {
+          delete parsed.notes;
+          localStorage.setItem(STORAGE_STANDARD_COLS_KEY, JSON.stringify(parsed));
+        }
         setStandardColumns({
           ...DEFAULT_STANDARD_COLUMNS,
-          ...JSON.parse(savedStandardCols),
+          ...parsed,
         });
       }
 

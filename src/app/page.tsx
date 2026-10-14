@@ -135,6 +135,7 @@ export default function Home() {
   async function handleAddJob(payload: NewJobPayload) {
     const today = new Date().toISOString().split("T")[0];
     const newId = crypto.randomUUID();
+    const appliedDate = payload.appliedDate || today;
 
     const newJob: JobApplication = {
       id: newId,
@@ -142,7 +143,7 @@ export default function Home() {
       company: payload.company,
       role: payload.role,
       status: payload.status,
-      appliedDate: today,
+      appliedDate,
       url: payload.url,
       notes: payload.notes,
       salary: payload.salary,
@@ -169,7 +170,7 @@ export default function Home() {
         company: payload.company,
         role: payload.role,
         status: payload.status,
-        applied_date: today,
+        applied_date: appliedDate,
         url: payload.url,
         notes: payload.notes,
       };

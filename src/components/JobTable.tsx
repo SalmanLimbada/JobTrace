@@ -144,7 +144,7 @@ export default function JobTable({
   const activeCustomFieldIds = customFields.filter((f) => f.enabled).map((f) => f.id);
   const allActiveIds = new Set([
     ...Object.entries(standardColumns)
-      .filter(([, v]) => v)
+      .filter(([k, v]) => v && k !== "notes")
       .map(([k]) => k),
     ...activeCustomFieldIds,
   ]);
