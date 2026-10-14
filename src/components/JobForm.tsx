@@ -68,6 +68,7 @@ export default function JobForm({ onAddJob }: JobFormProps) {
         className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"
       >
         <input
+          id="new-job-company-input"
           type="text"
           placeholder="Company (e.g. Amazon)"
           value={company}

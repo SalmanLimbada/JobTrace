@@ -5,7 +5,9 @@ import {
   useSettings,
   SUGGESTED_FIELDS,
   STANDARD_COLUMN_NAMES,
+  SHORTCUT_LABELS,
   type StandardColumnsSettings,
+  type ShortcutSettings,
 } from "@/context/SettingsContext";
 import type { CustomFieldType } from "@/types/job";
 
@@ -26,10 +28,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     addCustomField,
     removeCustomField,
     toggleCustomField,
+    shortcuts,
+    updateShortcut,
+    resetShortcuts,
   } = useSettings();
 
   const [newFieldName, setNewFieldName] = useState("");
   const [newFieldType, setNewFieldType] = useState<CustomFieldType>("text");
+  const [recordingShortcut, setRecordingShortcut] = useState<keyof ShortcutSettings | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -358,6 +364,77 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 No custom fields added yet.
               </p>
             )}
+          </div>
+
+          <div className="border-t border-[#30363d]/60" />
+
+          {/* Section 5: Keyboard Shortcuts */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block">
+                  Keyboard Shortcuts
+                </span>
+                <span className="text-[11px] text-[#8b949e]">
+                  Quick navigation and actions (click a key to rebind)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={resetShortcuts}
+                className="text-[11px] text-[#8b949e] hover:text-[#58a6ff] transition-colors cursor-pointer"
+              >
+                Reset Defaults
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              {(Object.keys(shortcuts) as (keyof ShortcutSettings)[]).map((action) => {
+                const isRecording = recordingShortcut === action;
+                const keyVal = shortcuts[action];
+                const info = SHORTCUT_LABELS[action];
+
+                return (
+                  <div
+                    key={action}
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-[#30363d] bg-[#0d1117]"
+                  >
+                    <div>
+                      <span className="font-medium text-[#f0f6fc] block">
+                        {info?.label || action}
+                      </span>
+                      <span className="text-[11px] text-[#8b949e]">
+                        {info?.desc}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setRecordingShortcut(action)}
+                      onKeyDown={(e) => {
+                        if (!isRecording) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (e.key === "Escape") {
+                          setRecordingShortcut(null);
+                          return;
+                        }
+                        const pressed = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+                        updateShortcut(action, pressed);
+                        setRecordingShortcut(null);
+                      }}
+                      className={`min-w-[42px] px-2.5 py-1 text-center font-mono text-xs rounded border transition-all cursor-pointer ${
+                        isRecording
+                          ? "border-[#58a6ff] bg-[#58a6ff]/20 text-[#58a6ff] animate-pulse ring-2 ring-[#58a6ff]/30"
+                          : "border-[#30363d] bg-[#21262d] text-[#c9d1d9] hover:border-[#8b949e] hover:bg-[#30363d]"
+                      }`}
+                    >
+                      {isRecording ? "Press key..." : keyVal?.toUpperCase() || "—"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 

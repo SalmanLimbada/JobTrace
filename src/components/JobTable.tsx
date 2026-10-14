@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { exportApplicationsToCSV } from "@/lib/csv";
 import CSVImportModal from "@/components/CSVImportModal";
 import EditJobModal from "@/components/EditJobModal";
-import { useSettings } from "@/context/SettingsContext";
+import {
+  useSettings,
+  STANDARD_COLUMN_NAMES,
+  type StandardColumnsSettings,
+} from "@/context/SettingsContext";
 
 interface JobTableProps {
   jobs: JobApplication[];
@@ -46,14 +50,113 @@ export default function JobTable({
   onDeleteJob,
   onImportJobs,
 }: JobTableProps) {
-  const { customFields, standardColumns, showRowNumbers } = useSettings();
-  const activeFields = customFields.filter((f) => f.enabled);
+  const {
+    customFields,
+    standardColumns,
+    showRowNumbers,
+    columnOrder,
+    reorderColumns,
+    shortcuts,
+    isSettingsOpen,
+    setIsSettingsOpen,
+  } = useSettings();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<ApplicationStatus | "All">("All");
   const [editingJob, setEditingJob] = useState<JobApplication | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
+  const [draggedColId, setDraggedColId] = useState<string | null>(null);
+  const [dragOverColId, setDragOverColId] = useState<string | null>(null);
+  const [dragOverSide, setDragOverSide] = useState<"left" | "right">("left");
+  const isDraggingRef = useRef(false);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (editingJob || isImportModalOpen || isSettingsOpen) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+
+      if (key === shortcuts.focusSearch?.toLowerCase()) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      } else if (key === shortcuts.addJob?.toLowerCase()) {
+        e.preventDefault();
+        const input = document.getElementById("new-job-company-input");
+        if (input) {
+          input.focus();
+          input.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      } else if (key === shortcuts.openSettings?.toLowerCase()) {
+        e.preventDefault();
+        setIsSettingsOpen(true);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [shortcuts, editingJob, isImportModalOpen, isSettingsOpen, setIsSettingsOpen]);
+
+  // Compute active ordered columns
+  const activeCustomFieldIds = customFields.filter((f) => f.enabled).map((f) => f.id);
+  const allActiveIds = new Set([
+    ...Object.entries(standardColumns)
+      .filter(([, v]) => v)
+      .map(([k]) => k),
+    ...activeCustomFieldIds,
+  ]);
+
+  const orderedVisibleColumns = columnOrder.filter((id) => allActiveIds.has(id));
+  allActiveIds.forEach((id) => {
+    if (!orderedVisibleColumns.includes(id)) {
+      orderedVisibleColumns.push(id);
+    }
+  });
+
+  const totalColumnCount = 1 + orderedVisibleColumns.length;
+
+  function handleHeaderClick(colId: string) {
+    if (isDraggingRef.current) return;
+    if (sortColumn === colId) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else {
+        setSortColumn(null);
+        setSortDirection("asc");
+      }
+    } else {
+      setSortColumn(colId);
+      setSortDirection("asc");
+    }
+  }
+
+  function getColumnLabel(colId: string): string {
+    if (colId in STANDARD_COLUMN_NAMES) {
+      return STANDARD_COLUMN_NAMES[colId as keyof StandardColumnsSettings];
+    }
+    const custom = customFields.find((f) => f.id === colId);
+    return custom?.name || colId;
+  }
+
+  // Filtered jobs
   const filteredJobs = jobs.filter((job) => {
     const matchesStatus = filterStatus === "All" || job.status === filterStatus;
     const query = searchQuery.toLowerCase().trim();
@@ -64,10 +167,116 @@ export default function JobTable({
     return matchesStatus && matchesSearch;
   });
 
-  const visibleStandardCount = (
-    Object.values(standardColumns) as boolean[]
-  ).filter(Boolean).length;
-  const totalColumnCount = 1 + visibleStandardCount + activeFields.length;
+  // Sorted jobs
+  const sortedJobs = [...filteredJobs].sort((a, b) => {
+    if (!sortColumn) return 0;
+    let valA = "";
+    let valB = "";
+
+    if (sortColumn === "company") {
+      valA = a.company || "";
+      valB = b.company || "";
+    } else if (sortColumn === "role") {
+      valA = a.role || "";
+      valB = b.role || "";
+    } else if (sortColumn === "status") {
+      valA = a.status || "";
+      valB = b.status || "";
+    } else if (sortColumn === "appliedDate") {
+      valA = a.appliedDate || "";
+      valB = b.appliedDate || "";
+    } else if (sortColumn === "url") {
+      valA = a.url || "";
+      valB = b.url || "";
+    } else if (sortColumn === "notes") {
+      valA = a.notes || "";
+      valB = b.notes || "";
+    } else {
+      valA = getFieldValue(a, sortColumn) || "";
+      valB = getFieldValue(b, sortColumn) || "";
+    }
+
+    const cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: "base" });
+    return sortDirection === "asc" ? cmp : -cmp;
+  });
+
+  function renderCell(job: JobApplication, colId: string) {
+    switch (colId) {
+      case "company":
+        return (
+          <td key={colId} className="p-3 font-medium text-zinc-100">
+            {job.company}
+          </td>
+        );
+      case "role":
+        return (
+          <td key={colId} className="p-3 text-zinc-300">
+            {job.role}
+          </td>
+        );
+      case "status":
+        return (
+          <td key={colId} className="p-3">
+            <select
+              value={job.status}
+              onChange={(e) => onStatusChange(job.id, e.target.value as ApplicationStatus)}
+              className="bg-zinc-800 text-zinc-200 text-xs px-2.5 py-1 rounded border border-zinc-700 outline-none cursor-pointer hover:border-zinc-500 transition-colors"
+            >
+              <option value="Applied">Applied</option>
+              <option value="Interview">Interview</option>
+              <option value="Offer">Offer</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Other">Other</option>
+            </select>
+          </td>
+        );
+      case "appliedDate":
+        return (
+          <td key={colId} className="p-3 text-zinc-400 text-xs font-mono">
+            {job.appliedDate}
+          </td>
+        );
+      case "url": {
+        const validUrl = formatUrl(job.url);
+        return (
+          <td key={colId} className="p-3">
+            {validUrl ? (
+              <a
+                href={validUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 hover:underline text-xs inline-flex items-center gap-1 font-medium"
+              >
+                View Post ↗
+              </a>
+            ) : (
+              <span className="text-zinc-600 text-xs font-mono">—</span>
+            )}
+          </td>
+        );
+      }
+      case "notes":
+        return (
+          <td key={colId} className="p-3 text-zinc-400 text-xs max-w-xs truncate" title={job.notes}>
+            {job.notes || <span className="text-zinc-600">—</span>}
+          </td>
+        );
+      default: {
+        const customField = customFields.find((f) => f.id === colId);
+        const val = getFieldValue(job, colId);
+        return (
+          <td
+            key={colId}
+            className={`p-3 text-xs ${
+              customField?.type === "date" ? "text-zinc-400 font-mono" : "text-zinc-300"
+            }`}
+          >
+            {val || <span className="text-zinc-600">—</span>}
+          </td>
+        );
+      }
+    }
+  }
 
   return (
     <div>
@@ -76,6 +285,7 @@ export default function JobTable({
         <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center flex-1 max-w-md">
           <div className="relative flex-1">
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search company or role..."
               value={searchQuery}
@@ -136,21 +346,83 @@ export default function JobTable({
               <th className={`${showRowNumbers ? "w-10 px-2" : "w-8 p-0"} text-center font-mono text-[11px]`}>
                 {showRowNumbers ? "#" : ""}
               </th>
-              {standardColumns.company && <th className="p-3.5">Company</th>}
-              {standardColumns.role && <th className="p-3.5">Role</th>}
-              {standardColumns.status && <th className="p-3.5">Status</th>}
-              {standardColumns.appliedDate && <th className="p-3.5">Date Applied</th>}
-              {activeFields.map((f) => (
-                <th key={f.id} className="p-3.5 whitespace-nowrap">
-                  {f.name}
-                </th>
-              ))}
-              {standardColumns.url && <th className="p-3.5">Posting URL</th>}
-              {standardColumns.notes && <th className="p-3.5">Notes</th>}
+              {orderedVisibleColumns.map((colId) => {
+                const isSorted = sortColumn === colId;
+                const isDragged = draggedColId === colId;
+                const isDragOver = dragOverColId === colId && !isDragged;
+
+                return (
+                  <th
+                    key={colId}
+                    draggable={true}
+                    onDragStart={(e) => {
+                      isDraggingRef.current = true;
+                      setDraggedColId(colId);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", colId);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (draggedColId && draggedColId !== colId) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const midpoint = rect.left + rect.width / 2;
+                        const side = e.clientX < midpoint ? "left" : "right";
+                        setDragOverColId(colId);
+                        setDragOverSide(side);
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      if (e.currentTarget === e.target) {
+                        setDragOverColId((prev) => (prev === colId ? null : prev));
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const source = draggedColId || e.dataTransfer.getData("text/plain");
+                      if (source && source !== colId) {
+                        reorderColumns(source, colId, dragOverSide);
+                      }
+                      setDraggedColId(null);
+                      setDragOverColId(null);
+                      setTimeout(() => {
+                        isDraggingRef.current = false;
+                      }, 100);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedColId(null);
+                      setDragOverColId(null);
+                      setTimeout(() => {
+                        isDraggingRef.current = false;
+                      }, 100);
+                    }}
+                    onClick={() => handleHeaderClick(colId)}
+                    className={`p-3.5 whitespace-nowrap select-none transition-all duration-150 group/header relative ${
+                      isDragged
+                        ? "opacity-30 bg-zinc-800/80 cursor-grabbing"
+                        : "cursor-grab active:cursor-grabbing hover:text-zinc-200"
+                    } ${
+                      isDragOver
+                        ? dragOverSide === "left"
+                          ? "border-l-2 border-l-[#58a6ff] bg-[#58a6ff]/10"
+                          : "border-r-2 border-r-[#58a6ff] bg-[#58a6ff]/10"
+                        : ""
+                    }`}
+                    title="Click to sort, drag left/right to reorder"
+                  >
+                    <div className="inline-flex items-center gap-1.5 pointer-events-none">
+                      <span>{getColumnLabel(colId)}</span>
+                      <span className="text-[10px] text-zinc-400 group-hover/header:text-zinc-200">
+                        {isSorted ? (sortDirection === "asc" ? "▲" : "▼") : ""}
+                      </span>
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {filteredJobs.length === 0 ? (
+            {sortedJobs.length === 0 ? (
               <tr>
                 <td
                   colSpan={totalColumnCount}
@@ -172,7 +444,7 @@ export default function JobTable({
                 </td>
               </tr>
             ) : (
-              filteredJobs.map((job, index) => (
+              sortedJobs.map((job, index) => (
                 <tr
                   key={job.id}
                   className="group border-b border-zinc-800/80 hover:bg-zinc-800/30 transition-colors"
@@ -208,67 +480,7 @@ export default function JobTable({
                     </button>
                   </td>
 
-                  {standardColumns.company && (
-                    <td className="p-3 font-medium text-zinc-100">{job.company}</td>
-                  )}
-                  {standardColumns.role && (
-                    <td className="p-3 text-zinc-300">{job.role}</td>
-                  )}
-                  {standardColumns.status && (
-                    <td className="p-3">
-                      <select
-                        value={job.status}
-                        onChange={(e) => onStatusChange(job.id, e.target.value as ApplicationStatus)}
-                        className="bg-zinc-800 text-zinc-200 text-xs px-2.5 py-1 rounded border border-zinc-700 outline-none cursor-pointer hover:border-zinc-500 transition-colors"
-                      >
-                        <option value="Applied">Applied</option>
-                        <option value="Interview">Interview</option>
-                        <option value="Offer">Offer</option>
-                        <option value="Rejected">Rejected</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </td>
-                  )}
-                  {standardColumns.appliedDate && (
-                    <td className="p-3 text-zinc-400 text-xs">{job.appliedDate}</td>
-                  )}
-                  {activeFields.map((f) => {
-                    const val = getFieldValue(job, f.id);
-                    return (
-                      <td
-                        key={f.id}
-                        className={`p-3 text-xs ${
-                          f.type === "date" ? "text-zinc-400 font-mono" : "text-zinc-300"
-                        }`}
-                      >
-                        {val || <span className="text-zinc-600">—</span>}
-                      </td>
-                    );
-                  })}
-                  {standardColumns.url && (
-                    <td className="p-3">
-                      {(() => {
-                        const validUrl = formatUrl(job.url);
-                        return validUrl ? (
-                          <a
-                            href={validUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 hover:underline text-xs inline-flex items-center gap-1 font-medium"
-                          >
-                            View Post ↗
-                          </a>
-                        ) : (
-                          <span className="text-zinc-600 text-xs font-mono">—</span>
-                        );
-                      })()}
-                    </td>
-                  )}
-                  {standardColumns.notes && (
-                    <td className="p-3 text-zinc-400 text-xs max-w-xs truncate" title={job.notes}>
-                      {job.notes || <span className="text-zinc-600">—</span>}
-                    </td>
-                  )}
+                  {orderedVisibleColumns.map((colId) => renderCell(job, colId))}
                 </tr>
               ))
             )}

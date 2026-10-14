@@ -32,6 +32,24 @@ export const STANDARD_COLUMN_NAMES: Record<keyof StandardColumnsSettings, string
   notes: "Notes",
 };
 
+export interface ShortcutSettings {
+  focusSearch: string;
+  addJob: string;
+  openSettings: string;
+}
+
+export const DEFAULT_SHORTCUTS: ShortcutSettings = {
+  focusSearch: "/",
+  addJob: "n",
+  openSettings: ",",
+};
+
+export const SHORTCUT_LABELS: Record<keyof ShortcutSettings, { label: string; desc: string }> = {
+  focusSearch: { label: "Focus Search", desc: "Jump to search bar" },
+  addJob: { label: "New Application", desc: "Focus company input in form" },
+  openSettings: { label: "Open Settings", desc: "Open preferences modal" },
+};
+
 export const SUGGESTED_FIELDS: Omit<CustomFieldDefinition, "enabled">[] = [
   { id: "salary", name: "Salary", type: "text" },
   { id: "location", name: "Location", type: "text" },
@@ -45,6 +63,8 @@ export const DEFAULT_FIELDS: CustomFieldDefinition[] = [
   { id: "location", name: "Location", type: "text", enabled: true },
   { id: "deadlineDate", name: "Next Round / Deadline", type: "date", enabled: false },
 ];
+
+export const BASE_COLUMN_ORDER = ["company", "role", "status", "appliedDate", "salary", "location", "deadlineDate", "url", "notes"];
 
 export interface ColumnSettings {
   salary: boolean;
@@ -66,6 +86,15 @@ interface SettingsContextType {
   addCustomField: (name: string, type?: CustomFieldType) => void;
   removeCustomField: (id: string) => void;
   toggleCustomField: (id: string) => void;
+  columnOrder: string[];
+  reorderColumns: (sourceId: string, targetId: string, side?: "left" | "right") => void;
+  moveColumn: (id: string, direction: "up" | "down") => void;
+  resetColumnOrder: () => void;
+  shortcuts: ShortcutSettings;
+  updateShortcut: (action: keyof ShortcutSettings, key: string) => void;
+  resetShortcuts: () => void;
+  isSettingsOpen: boolean;
+  setIsSettingsOpen: (open: boolean) => void;
   columns: ColumnSettings;
   setColumnVisible: (column: string, visible: boolean) => void;
 }
@@ -76,12 +105,17 @@ const STORAGE_THEME_KEY = "jobtrace_theme";
 const STORAGE_FIELDS_KEY = "jobtrace_custom_fields_v2";
 const STORAGE_STANDARD_COLS_KEY = "jobtrace_standard_columns";
 const STORAGE_ROW_NUMBERS_KEY = "jobtrace_row_numbers";
+const STORAGE_COLUMN_ORDER_KEY = "jobtrace_column_order";
+const STORAGE_SHORTCUTS_KEY = "jobtrace_shortcuts";
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<AppTheme>("dark");
   const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(DEFAULT_FIELDS);
   const [standardColumns, setStandardColumns] = useState<StandardColumnsSettings>(DEFAULT_STANDARD_COLUMNS);
   const [showRowNumbers, setShowRowNumbersState] = useState<boolean>(true);
+  const [columnOrder, setColumnOrderState] = useState<string[]>(BASE_COLUMN_ORDER);
+  const [shortcuts, setShortcutsState] = useState<ShortcutSettings>(DEFAULT_SHORTCUTS);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -106,10 +140,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setShowRowNumbersState(savedRowNumbers === "true");
       }
 
+      // Shortcuts
+      const savedShortcuts = localStorage.getItem(STORAGE_SHORTCUTS_KEY);
+      if (savedShortcuts) {
+        setShortcutsState({
+          ...DEFAULT_SHORTCUTS,
+          ...JSON.parse(savedShortcuts),
+        });
+      }
+
       // Custom Fields
+      let loadedFields = DEFAULT_FIELDS;
       const savedFields = localStorage.getItem(STORAGE_FIELDS_KEY);
       if (savedFields) {
-        setCustomFields(JSON.parse(savedFields));
+        loadedFields = JSON.parse(savedFields);
+        setCustomFields(loadedFields);
       } else {
         const oldCols = localStorage.getItem("jobtrace_columns");
         if (oldCols) {
@@ -120,6 +165,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
               { id: "location", name: "Location", type: "text", enabled: !!parsed.location },
               { id: "deadlineDate", name: "Next Round / Deadline", type: "date", enabled: !!parsed.deadlineDate },
             ];
+            loadedFields = migrated;
             setCustomFields(migrated);
             localStorage.setItem(STORAGE_FIELDS_KEY, JSON.stringify(migrated));
           } catch {
@@ -128,6 +174,24 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         } else {
           setCustomFields(DEFAULT_FIELDS);
         }
+      }
+
+      // Column Order
+      const savedOrder = localStorage.getItem(STORAGE_COLUMN_ORDER_KEY);
+      if (savedOrder) {
+        const parsed = JSON.parse(savedOrder) as string[];
+        // Ensure any new custom field is included
+        const full = [...parsed];
+        loadedFields.forEach((f) => {
+          if (!full.includes(f.id)) full.push(f.id);
+        });
+        setColumnOrderState(full);
+      } else {
+        const allIds = [...BASE_COLUMN_ORDER];
+        loadedFields.forEach((f) => {
+          if (!allIds.includes(f.id)) allIds.push(f.id);
+        });
+        setColumnOrderState(allIds);
       }
     } catch {
       // Ignore localStorage errors
@@ -174,6 +238,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_FIELDS_KEY, JSON.stringify(fields));
     } catch {}
+
+    // Make sure columnOrder has any new field
+    const nextOrder = [...columnOrder];
+    fields.forEach((f) => {
+      if (!nextOrder.includes(f.id)) nextOrder.push(f.id);
+    });
+    setColumnOrderState(nextOrder);
+    try {
+      localStorage.setItem(STORAGE_COLUMN_ORDER_KEY, JSON.stringify(nextOrder));
+    } catch {}
   };
 
   const addCustomField = (name: string, type: CustomFieldType = "text") => {
@@ -182,7 +256,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const cleanId = trimmed.toLowerCase().replace(/[^a-z0-9]/g, "_");
     const id = cleanId || `field_${Date.now()}`;
 
-    // Prevent duplicates
     if (customFields.some((f) => f.id === id || f.name.toLowerCase() === trimmed.toLowerCase())) {
       saveFields(
         customFields.map((f) => (f.id === id ? { ...f, enabled: true } : f))
@@ -201,12 +274,69 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const removeCustomField = (id: string) => {
     saveFields(customFields.filter((f) => f.id !== id));
+    setColumnOrderState(columnOrder.filter((c) => c !== id));
   };
 
   const toggleCustomField = (id: string) => {
     saveFields(
       customFields.map((f) => (f.id === id ? { ...f, enabled: !f.enabled } : f))
     );
+  };
+
+  const reorderColumns = (sourceId: string, targetId: string, side: "left" | "right" = "left") => {
+    if (sourceId === targetId) return;
+    const sourceIdx = columnOrder.indexOf(sourceId);
+    if (sourceIdx === -1) return;
+    const next = [...columnOrder];
+    const [moved] = next.splice(sourceIdx, 1);
+    const targetIdx = next.indexOf(targetId);
+    if (targetIdx === -1) return;
+    const insertIdx = side === "left" ? targetIdx : targetIdx + 1;
+    next.splice(insertIdx, 0, moved);
+    setColumnOrderState(next);
+    try {
+      localStorage.setItem(STORAGE_COLUMN_ORDER_KEY, JSON.stringify(next));
+    } catch {}
+  };
+
+  const moveColumn = (id: string, direction: "up" | "down") => {
+    const idx = columnOrder.indexOf(id);
+    if (idx === -1) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= columnOrder.length) return;
+    const next = [...columnOrder];
+    const [moved] = next.splice(idx, 1);
+    next.splice(targetIdx, 0, moved);
+    setColumnOrderState(next);
+    try {
+      localStorage.setItem(STORAGE_COLUMN_ORDER_KEY, JSON.stringify(next));
+    } catch {}
+  };
+
+  const resetColumnOrder = () => {
+    const defaultIds = [...BASE_COLUMN_ORDER];
+    customFields.forEach((f) => {
+      if (!defaultIds.includes(f.id)) defaultIds.push(f.id);
+    });
+    setColumnOrderState(defaultIds);
+    try {
+      localStorage.removeItem(STORAGE_COLUMN_ORDER_KEY);
+    } catch {}
+  };
+
+  const updateShortcut = (action: keyof ShortcutSettings, key: string) => {
+    const updated = { ...shortcuts, [action]: key.toLowerCase() };
+    setShortcutsState(updated);
+    try {
+      localStorage.setItem(STORAGE_SHORTCUTS_KEY, JSON.stringify(updated));
+    } catch {}
+  };
+
+  const resetShortcuts = () => {
+    setShortcutsState(DEFAULT_SHORTCUTS);
+    try {
+      localStorage.removeItem(STORAGE_SHORTCUTS_KEY);
+    } catch {}
   };
 
   // Backwards compatibility helper
@@ -248,6 +378,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         addCustomField,
         removeCustomField,
         toggleCustomField,
+        columnOrder,
+        reorderColumns,
+        moveColumn,
+        resetColumnOrder,
+        shortcuts,
+        updateShortcut,
+        resetShortcuts,
+        isSettingsOpen,
+        setIsSettingsOpen,
         columns,
         setColumnVisible,
       }}

@@ -8,9 +8,8 @@ import SettingsModal from "@/components/SettingsModal";
 
 export default function Navbar() {
   const { user, signOut, isLoading } = useAuth();
-  const { theme, toggleTheme } = useSettings();
+  const { theme, toggleTheme, isSettingsOpen, setIsSettingsOpen } = useSettings();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
     <>
