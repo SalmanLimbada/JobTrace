@@ -9,8 +9,17 @@ create table if not exists applications (
   applied_date text not null,
   url text default '#',
   notes text default '',
+  salary text default '',
+  location text default '',
+  deadline_date text default '',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Migration for existing tables:
+alter table applications add column if not exists salary text default '';
+alter table applications add column if not exists location text default '';
+alter table applications add column if not exists deadline_date text default '';
+alter table applications add column if not exists custom_fields jsonb default '{}'::jsonb;
 
 -- Enable Row Level Security (RLS)
 alter table applications enable row level security;
