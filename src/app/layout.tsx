@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "JobTrace — Active Job Tracker",
+  title: "JobTrace",
   description: "A fast, active job application tracker with cloud sync and companion Chrome extension",
 };
 

@@ -1,7 +1,8 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
-import { exportApplicationsToCSV, parseApplicationsFromCSV } from "@/lib/csv";
+import { exportApplicationsToCSV } from "@/lib/csv";
+import CSVImportModal from "@/components/CSVImportModal";
 
 interface JobTableProps {
   jobs: JobApplication[];
@@ -37,7 +38,7 @@ export default function JobTable({
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<JobApplication>>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const filteredJobs = jobs.filter((job) => {
     const matchesStatus = filterStatus === "All" || job.status === filterStatus;
@@ -91,25 +92,6 @@ export default function JobTable({
     }
   }
 
-  async function handleImportCSV(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const { jobs: newJobsMap, count } = parseApplicationsFromCSV(text);
-      onImportJobs(newJobsMap, count);
-      alert(`Successfully imported ${count} job application${count === 1 ? "" : "s"}!`);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to read CSV file.";
-      alert(message);
-    } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  }
-
   return (
     <div>
       {/* Search & Status Filter Toolbar */}
@@ -143,19 +125,12 @@ export default function JobTable({
           </button>
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setIsImportModalOpen(true)}
             className="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 px-3 py-2 rounded transition-colors cursor-pointer whitespace-nowrap"
             title="Upload applications from CSV"
           >
             Import CSV
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            onChange={handleImportCSV}
-            className="hidden"
-          />
         </div>
 
         <div className="flex flex-wrap gap-1.5 items-center">
@@ -354,6 +329,12 @@ export default function JobTable({
           </tbody>
         </table>
       </div>
+
+      <CSVImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={onImportJobs}
+      />
     </div>
   );
 }
