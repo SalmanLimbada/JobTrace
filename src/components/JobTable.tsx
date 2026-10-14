@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { exportApplicationsToCSV } from "@/lib/csv";
 import CSVImportModal from "@/components/CSVImportModal";
+import { useSettings } from "@/context/SettingsContext";
 
 interface JobTableProps {
   jobs: JobApplication[];
@@ -26,6 +27,16 @@ function formatUrl(rawUrl: string): string | null {
   return null;
 }
 
+function getFieldValue(job: JobApplication, fieldId: string): string | undefined {
+  if (job.customFields && job.customFields[fieldId] !== undefined) {
+    return job.customFields[fieldId];
+  }
+  if (fieldId === "salary") return job.salary;
+  if (fieldId === "location") return job.location;
+  if (fieldId === "deadlineDate") return job.deadlineDate;
+  return undefined;
+}
+
 export default function JobTable({
   jobs,
   onStatusChange,
@@ -33,6 +44,8 @@ export default function JobTable({
   onDeleteJob,
   onImportJobs,
 }: JobTableProps) {
+  const { customFields } = useSettings();
+  const activeFields = customFields.filter((f) => f.enabled);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<ApplicationStatus | "All">("All");
 
@@ -52,6 +65,11 @@ export default function JobTable({
 
   function startEditing(job: JobApplication) {
     setEditingId(job.id);
+    const initialCustom: Record<string, string> = { ...(job.customFields || {}) };
+    if (job.salary && !initialCustom.salary) initialCustom.salary = job.salary;
+    if (job.location && !initialCustom.location) initialCustom.location = job.location;
+    if (job.deadlineDate && !initialCustom.deadlineDate) initialCustom.deadlineDate = job.deadlineDate;
+
     setEditForm({
       company: job.company,
       role: job.role,
@@ -59,12 +77,30 @@ export default function JobTable({
       appliedDate: job.appliedDate,
       url: job.url,
       notes: job.notes,
+      salary: job.salary,
+      location: job.location,
+      deadlineDate: job.deadlineDate,
+      customFields: initialCustom,
     });
   }
 
   function cancelEditing() {
     setEditingId(null);
     setEditForm({});
+  }
+
+  function handleEditCustomField(fieldId: string, value: string) {
+    setEditForm((prev) => {
+      const nextCustom = { ...(prev.customFields || {}), [fieldId]: value };
+      const next: Partial<JobApplication> = {
+        ...prev,
+        customFields: nextCustom,
+      };
+      if (fieldId === "salary") next.salary = value;
+      if (fieldId === "location") next.location = value;
+      if (fieldId === "deadlineDate") next.deadlineDate = value;
+      return next;
+    });
   }
 
   function handleSave(id: string) {
@@ -77,6 +113,10 @@ export default function JobTable({
       appliedDate: editForm.appliedDate,
       url: editForm.url?.trim() || "#",
       notes: editForm.notes?.trim() || "",
+      salary: editForm.salary || editForm.customFields?.["salary"],
+      location: editForm.location || editForm.customFields?.["location"],
+      deadlineDate: editForm.deadlineDate || editForm.customFields?.["deadlineDate"],
+      customFields: editForm.customFields,
     });
 
     setEditingId(null);
@@ -117,7 +157,7 @@ export default function JobTable({
           </div>
           <button
             type="button"
-            onClick={() => exportApplicationsToCSV(jobs)}
+            onClick={() => exportApplicationsToCSV(jobs, customFields)}
             className="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 px-3 py-2 rounded transition-colors cursor-pointer whitespace-nowrap"
             title="Download applications as CSV"
           >
@@ -160,6 +200,11 @@ export default function JobTable({
               <th className="p-3.5">Role</th>
               <th className="p-3.5">Status</th>
               <th className="p-3.5">Date Applied</th>
+              {activeFields.map((f) => (
+                <th key={f.id} className="p-3.5 whitespace-nowrap">
+                  {f.name}
+                </th>
+              ))}
               <th className="p-3.5">Posting URL</th>
               <th className="p-3.5">Notes</th>
               <th className="p-3.5">Actions</th>
@@ -168,7 +213,10 @@ export default function JobTable({
           <tbody>
             {filteredJobs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm">
+                <td
+                  colSpan={7 + activeFields.length}
+                  className="p-8 text-center text-zinc-500 text-sm"
+                >
                   No job applications found matching your criteria.
                   {(searchQuery || filterStatus !== "All") && (
                     <button
@@ -230,6 +278,17 @@ export default function JobTable({
                           className="bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:border-zinc-400"
                         />
                       </td>
+                      {activeFields.map((f) => (
+                        <td key={f.id} className="p-3">
+                          <input
+                            type={f.type === "date" ? "date" : f.type === "number" ? "number" : "text"}
+                            value={editForm.customFields?.[f.id] ?? getFieldValue(job, f.id) ?? ""}
+                            onChange={(e) => handleEditCustomField(f.id, e.target.value)}
+                            placeholder={f.name}
+                            className="bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:border-zinc-400 w-full"
+                          />
+                        </td>
+                      ))}
                       <td className="p-3">
                         <input
                           type="text"
@@ -286,6 +345,19 @@ export default function JobTable({
                       </select>
                     </td>
                     <td className="p-3 text-zinc-400 text-xs">{job.appliedDate}</td>
+                    {activeFields.map((f) => {
+                      const val = getFieldValue(job, f.id);
+                      return (
+                        <td
+                          key={f.id}
+                          className={`p-3 text-xs ${
+                            f.type === "date" ? "text-zinc-400 font-mono" : "text-zinc-300"
+                          }`}
+                        >
+                          {val || <span className="text-zinc-600">—</span>}
+                        </td>
+                      );
+                    })}
                     <td className="p-3">
                       {(() => {
                         const validUrl = formatUrl(job.url);

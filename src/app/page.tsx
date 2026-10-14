@@ -63,9 +63,17 @@ export default function Home() {
             applied_date: job.appliedDate,
             url: job.url,
             notes: job.notes,
+            salary: job.salary || "",
+            location: job.location || "",
+            deadline_date: job.deadlineDate || "",
+            custom_fields: job.customFields || {},
           }));
 
-          await supabase.from("applications").insert(rowsToMigrate);
+          let { error: migError } = await supabase.from("applications").insert(rowsToMigrate);
+          if (migError && migError.message?.includes("custom_fields")) {
+            const fallback = rowsToMigrate.map(({ custom_fields, ...rest }) => rest);
+            await supabase.from("applications").insert(fallback);
+          }
           localStorage.removeItem(GUEST_STORAGE_KEY);
         }
       }
@@ -97,6 +105,10 @@ export default function Home() {
             appliedDate: row.applied_date,
             url: row.url || "#",
             notes: row.notes || "",
+            salary: row.salary || undefined,
+            location: row.location || undefined,
+            deadlineDate: row.deadline_date || undefined,
+            customFields: row.custom_fields || undefined,
           };
         }
         setJobs(map);
@@ -133,6 +145,10 @@ export default function Home() {
       appliedDate: today,
       url: payload.url,
       notes: payload.notes,
+      salary: payload.salary,
+      location: payload.location,
+      deadlineDate: payload.deadlineDate,
+      customFields: payload.customFields,
     };
 
     // Update state immediately
@@ -147,20 +163,26 @@ export default function Home() {
 
     // Authenticated: insert into Supabase
     try {
-      const { error } = await supabase
-        .from("applications")
-        .insert([
-          {
-            id: newId,
-            user_id: user.id,
-            company: payload.company,
-            role: payload.role,
-            status: payload.status,
-            applied_date: today,
-            url: payload.url,
-            notes: payload.notes,
-          },
-        ]);
+      const dbRow: Record<string, unknown> = {
+        id: newId,
+        user_id: user.id,
+        company: payload.company,
+        role: payload.role,
+        status: payload.status,
+        applied_date: today,
+        url: payload.url,
+        notes: payload.notes,
+      };
+      if (payload.salary) dbRow.salary = payload.salary;
+      if (payload.location) dbRow.location = payload.location;
+      if (payload.deadlineDate) dbRow.deadline_date = payload.deadlineDate;
+      if (payload.customFields) dbRow.custom_fields = payload.customFields;
+
+      let { error } = await supabase.from("applications").insert([dbRow]);
+      if (error && error.message?.includes("custom_fields")) {
+        delete dbRow.custom_fields;
+        error = (await supabase.from("applications").insert([dbRow])).error;
+      }
 
       if (error) {
         console.error("Error creating application in database:", error.message);
@@ -222,11 +244,20 @@ export default function Home() {
       if (updated.appliedDate !== undefined) dbPayload.applied_date = updated.appliedDate;
       if (updated.url !== undefined) dbPayload.url = updated.url;
       if (updated.notes !== undefined) dbPayload.notes = updated.notes;
+      if (updated.salary !== undefined) dbPayload.salary = updated.salary;
+      if (updated.location !== undefined) dbPayload.location = updated.location;
+      if (updated.deadlineDate !== undefined) dbPayload.deadline_date = updated.deadlineDate;
+      if (updated.customFields !== undefined) dbPayload.custom_fields = updated.customFields;
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from("applications")
         .update(dbPayload)
         .eq("id", id);
+
+      if (error && error.message?.includes("custom_fields")) {
+        delete dbPayload.custom_fields;
+        error = (await supabase.from("applications").update(dbPayload).eq("id", id)).error;
+      }
 
       if (error) {
         console.error("Error updating application in database:", error.message);
@@ -285,11 +316,20 @@ export default function Home() {
         applied_date: job.appliedDate,
         url: job.url,
         notes: job.notes,
+        salary: job.salary || "",
+        location: job.location || "",
+        deadline_date: job.deadlineDate || "",
+        custom_fields: job.customFields || {},
       }));
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from("applications")
         .insert(rowsToInsert);
+
+      if (error && error.message?.includes("custom_fields")) {
+        const fallbackRows = rowsToInsert.map(({ custom_fields, ...rest }) => rest);
+        error = (await supabase.from("applications").insert(fallbackRows)).error;
+      }
 
       if (error) {
         console.error("Error saving imported jobs to database:", error.message);

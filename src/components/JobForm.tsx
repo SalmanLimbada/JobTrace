@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { ApplicationStatus } from "@/types/job";
+import { useSettings } from "@/context/SettingsContext";
 
 export interface NewJobPayload {
   company: string;
@@ -8,6 +9,10 @@ export interface NewJobPayload {
   status: ApplicationStatus;
   url: string;
   notes: string;
+  salary?: string;
+  location?: string;
+  deadlineDate?: string;
+  customFields?: Record<string, string>;
 }
 
 interface JobFormProps {
@@ -15,11 +20,19 @@ interface JobFormProps {
 }
 
 export default function JobForm({ onAddJob }: JobFormProps) {
+  const { customFields } = useSettings();
+  const activeFields = customFields.filter((f) => f.enabled);
+
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState<ApplicationStatus>("Applied");
   const [notes, setNotes] = useState("");
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+
+  function handleFieldValueChange(id: string, val: string) {
+    setFieldValues((prev) => ({ ...prev, [id]: val }));
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,6 +44,10 @@ export default function JobForm({ onAddJob }: JobFormProps) {
       status,
       url: url.trim() || "#",
       notes: notes.trim(),
+      salary: fieldValues["salary"]?.trim() || undefined,
+      location: fieldValues["location"]?.trim() || undefined,
+      deadlineDate: fieldValues["deadlineDate"]?.trim() || undefined,
+      customFields: Object.keys(fieldValues).length > 0 ? fieldValues : undefined,
     });
 
     setCompany("");
@@ -38,6 +55,7 @@ export default function JobForm({ onAddJob }: JobFormProps) {
     setUrl("");
     setStatus("Applied");
     setNotes("");
+    setFieldValues({});
   }
 
   return (
@@ -45,7 +63,10 @@ export default function JobForm({ onAddJob }: JobFormProps) {
       <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">
         Add New Application
       </h2>
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <form
+        onSubmit={handleSubmit}
+        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"
+      >
         <input
           type="text"
           placeholder="Company (e.g. Amazon)"
@@ -63,6 +84,17 @@ export default function JobForm({ onAddJob }: JobFormProps) {
           className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
           required
         />
+
+        {activeFields.map((field) => (
+          <input
+            key={field.id}
+            type={field.type === "date" ? "date" : field.type === "number" ? "number" : "text"}
+            placeholder={field.name}
+            value={fieldValues[field.id] || ""}
+            onChange={(e) => handleFieldValueChange(field.id, e.target.value)}
+            className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+          />
+        ))}
 
         <input
           type="text"
