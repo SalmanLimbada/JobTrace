@@ -15,4 +15,77 @@
 body {
   background: #0d1117;
   color: #c9d1d9;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* --- Clean, Instant Light Mode --- */
+html[data-theme="light"] body,
+html[data-theme="light"] main {
+  background-color: #f6f8fa !important;
+  color: #24292f !important;
+}
+
+html[data-theme="light"] header,
+html[data-theme="light"] section,
+html[data-theme="light"] .bg-\[\#161b22\],
+html[data-theme="light"] .bg-zinc-900\/60,
+html[data-theme="light"] .bg-zinc-900\/20,
+html[data-theme="light"] .bg-zinc-900 {
+  background-color: #ffffff !important;
+}
+
+html[data-theme="light"] thead {
+  background-color: #f6f8fa !important;
+}
+
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] .bg-zinc-950,
+html[data-theme="light"] .bg-\[\#0d1117\] {
+  background-color: #ffffff !important;
+  color: #1f2328 !important;
+  border-color: #d0d7de !important;
+}
+
+html[data-theme="light"] input::placeholder {
+  color: #8c959f !important;
+}
+
+html[data-theme="light"] .bg-\[\#21262d\],
+html[data-theme="light"] .bg-zinc-800 {
+  background-color: #eaeef2 !important;
+  color: #1f2328 !important;
+}
+
+html[data-theme="light"] .hover\:bg-zinc-800:hover,
+html[data-theme="light"] .hover\:bg-\[\#30363d\]:hover {
+  background-color: #e1e4e8 !important;
+}
+
+html[data-theme="light"] .border-\[\#30363d\],
+html[data-theme="light"] .border-zinc-800,
+html[data-theme="light"] .border-zinc-700,
+html[data-theme="light"] tr.border-b {
+  border-color: #d0d7de !important;
+}
+
+html[data-theme="light"] .text-\[\#f0f6fc\],
+html[data-theme="light"] .text-zinc-100 {
+  color: #1f2328 !important;
+}
+
+html[data-theme="light"] .text-\[\#c9d1d9\],
+html[data-theme="light"] .text-zinc-200,
+html[data-theme="light"] .text-zinc-300 {
+  color: #24292f !important;
+}
+
+html[data-theme="light"] .text-\[\#8b949e\],
+html[data-theme="light"] .text-zinc-400,
+html[data-theme="light"] .text-zinc-500 {
+  color: #59636e !important;
+}
+
+html[data-theme="light"] tr:hover {
+  background-color: #f6f8fa !important;
 }
