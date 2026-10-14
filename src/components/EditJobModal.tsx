@@ -19,7 +19,7 @@ export default function EditJobModal({
   onSave,
   onDelete,
 }: EditJobModalProps) {
-  const { customFields } = useSettings();
+  const { customFields, statuses } = useSettings();
   const activeCustomFields = customFields.filter((f) => f.enabled);
 
   const [company, setCompany] = useState("");
@@ -177,11 +177,11 @@ export default function EditJobModal({
                 onChange={(e) => setStatus(e.target.value as ApplicationStatus)}
                 className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors cursor-pointer"
               >
-                <option value="Applied">Applied</option>
-                <option value="Interview">Interview</option>
-                <option value="Offer">Offer</option>
-                <option value="Rejected">Rejected</option>
-                <option value="Other">Other</option>
+                {Array.from(new Set([...statuses, ...(job?.status ? [job.status] : [])])).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

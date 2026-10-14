@@ -50,6 +50,18 @@ export const SHORTCUT_LABELS: Record<keyof ShortcutSettings, { label: string; de
   openSettings: { label: "Open Settings", desc: "Open preferences modal" },
 };
 
+export const DEFAULT_STATUSES: string[] = ["Applied", "Interview", "Offer", "Rejected"];
+
+export const SUGGESTED_STATUSES: string[] = [
+  "Other",
+  "OA / Assessment",
+  "Phone Screen",
+  "Technical Screen",
+  "Behavioral",
+  "Waitlisted",
+  "Withdrawn",
+];
+
 export const SUGGESTED_FIELDS: Omit<CustomFieldDefinition, "enabled">[] = [
   { id: "salary", name: "Salary", type: "text" },
   { id: "location", name: "Location", type: "text" },
@@ -86,6 +98,12 @@ interface SettingsContextType {
   addCustomField: (name: string, type?: CustomFieldType) => void;
   removeCustomField: (id: string) => void;
   toggleCustomField: (id: string) => void;
+  statuses: string[];
+  addStatus: (name: string) => void;
+  removeStatus: (name: string) => void;
+  moveStatus: (name: string, direction: "up" | "down") => void;
+  reorderStatuses: (sourceName: string, targetName: string, side?: "above" | "below") => void;
+  resetStatuses: () => void;
   columnOrder: string[];
   reorderColumns: (sourceId: string, targetId: string, side?: "left" | "right") => void;
   moveColumn: (id: string, direction: "up" | "down") => void;
@@ -107,6 +125,7 @@ const STORAGE_STANDARD_COLS_KEY = "jobtrace_standard_columns";
 const STORAGE_ROW_NUMBERS_KEY = "jobtrace_row_numbers";
 const STORAGE_COLUMN_ORDER_KEY = "jobtrace_column_order";
 const STORAGE_SHORTCUTS_KEY = "jobtrace_shortcuts";
+const STORAGE_STATUSES_KEY = "jobtrace_statuses_v1";
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<AppTheme>("dark");
@@ -115,10 +134,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [showRowNumbers, setShowRowNumbersState] = useState<boolean>(true);
   const [columnOrder, setColumnOrderState] = useState<string[]>(BASE_COLUMN_ORDER);
   const [shortcuts, setShortcutsState] = useState<ShortcutSettings>(DEFAULT_SHORTCUTS);
+  const [statuses, setStatusesState] = useState<string[]>(DEFAULT_STATUSES);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     try {
+      // Statuses
+      const savedStatuses = localStorage.getItem(STORAGE_STATUSES_KEY);
+      if (savedStatuses) {
+        const parsed = JSON.parse(savedStatuses);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setStatusesState(parsed);
+        }
+      }
       // Theme
       const savedTheme = localStorage.getItem(STORAGE_THEME_KEY);
       const activeTheme: AppTheme = savedTheme === "light" ? "light" : "dark";
@@ -339,6 +367,64 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     } catch {}
   };
 
+  const addStatus = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const exists = statuses.some((s) => s.toLowerCase() === trimmed.toLowerCase());
+    if (exists) return;
+    const next = [...statuses, trimmed];
+    setStatusesState(next);
+    try {
+      localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(next));
+    } catch {}
+  };
+
+  const removeStatus = (name: string) => {
+    if (statuses.length <= 1) return;
+    const next = statuses.filter((s) => s.toLowerCase() !== name.toLowerCase());
+    setStatusesState(next);
+    try {
+      localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(next));
+    } catch {}
+  };
+
+  const moveStatus = (name: string, direction: "up" | "down") => {
+    const idx = statuses.indexOf(name);
+    if (idx === -1) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= statuses.length) return;
+    const next = [...statuses];
+    const [moved] = next.splice(idx, 1);
+    next.splice(targetIdx, 0, moved);
+    setStatusesState(next);
+    try {
+      localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(next));
+    } catch {}
+  };
+
+  const reorderStatuses = (sourceName: string, targetName: string, side: "above" | "below" = "above") => {
+    if (sourceName === targetName) return;
+    const sourceIdx = statuses.indexOf(sourceName);
+    if (sourceIdx === -1) return;
+    const next = [...statuses];
+    const [moved] = next.splice(sourceIdx, 1);
+    const targetIdx = next.indexOf(targetName);
+    if (targetIdx === -1) return;
+    const insertIdx = side === "above" ? targetIdx : targetIdx + 1;
+    next.splice(insertIdx, 0, moved);
+    setStatusesState(next);
+    try {
+      localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(next));
+    } catch {}
+  };
+
+  const resetStatuses = () => {
+    setStatusesState(DEFAULT_STATUSES);
+    try {
+      localStorage.removeItem(STORAGE_STATUSES_KEY);
+    } catch {}
+  };
+
   // Backwards compatibility helper
   const columns: ColumnSettings = {
     salary: customFields.some((f) => f.id === "salary" && f.enabled),
@@ -378,6 +464,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         addCustomField,
         removeCustomField,
         toggleCustomField,
+        statuses,
+        addStatus,
+        removeStatus,
+        moveStatus,
+        reorderStatuses,
+        resetStatuses,
         columnOrder,
         reorderColumns,
         moveColumn,

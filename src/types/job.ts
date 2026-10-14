@@ -1,4 +1,4 @@
-export type ApplicationStatus = "Applied" | "Rejected" | "Interview" | "Offer" | "Other";
+export type ApplicationStatus = "Applied" | "Rejected" | "Interview" | "Offer" | "Other" | (string & {});
 
 export type CustomFieldType = "text" | "number" | "date";
 

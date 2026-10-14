@@ -62,7 +62,8 @@ html[data-theme="light"] .theme-slider-track {
   border-color: #d0d7de !important;
 }
 
-html[data-theme="light"] .theme-slider-thumb {
+html[data-theme="light"] .theme-slider-thumb,
+html[data-theme="light"] .filter-slider-thumb {
   background-color: #ffffff !important;
   border-color: #d0d7de !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;

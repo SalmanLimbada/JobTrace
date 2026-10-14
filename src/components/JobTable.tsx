@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { exportApplicationsToCSV } from "@/lib/csv";
 import CSVImportModal from "@/components/CSVImportModal";
@@ -56,15 +56,17 @@ export default function JobTable({
     showRowNumbers,
     columnOrder,
     reorderColumns,
+    statuses,
     shortcuts,
     isSettingsOpen,
     setIsSettingsOpen,
   } = useSettings();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<ApplicationStatus | "All">("All");
+  const [filterStatus, setFilterStatus] = useState<string>("All");
   const [editingJob, setEditingJob] = useState<JobApplication | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -74,6 +76,9 @@ export default function JobTable({
   const isDraggingRef = useRef(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const pillTrackRef = useRef<HTMLDivElement>(null);
+  const [thumbStyle, setThumbStyle] = useState({ left: 4, width: 0, opacity: 0 });
 
   // Global Keyboard Shortcuts
   useEffect(() => {
@@ -114,6 +119,25 @@ export default function JobTable({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [shortcuts, editingJob, isImportModalOpen, isSettingsOpen, setIsSettingsOpen]);
+
+  // Click outside listener for "More ▾" dropdown
+  useEffect(() => {
+    if (!isMoreOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setIsMoreOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setIsMoreOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMoreOpen]);
 
   // Compute active ordered columns
   const activeCustomFieldIds = customFields.filter((f) => f.enabled).map((f) => f.id);
@@ -156,14 +180,73 @@ export default function JobTable({
     return custom?.name || colId;
   }
 
-  // Filtered jobs
+  // Distinct statuses from user settings + any existing jobs (memoized to keep stable reference)
+  const allKnownStatuses = useMemo(() => {
+    return Array.from(new Set([...statuses, ...jobs.map((j) => j.status)]));
+  }, [statuses, jobs]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: jobs.length };
+    allKnownStatuses.forEach((s) => {
+      counts[s] = 0;
+    });
+    jobs.forEach((job) => {
+      counts[job.status] = (counts[job.status] || 0) + 1;
+    });
+    return counts;
+  }, [allKnownStatuses, jobs]);
+
+  const MAX_VISIBLE = 4;
+  const topStatuses = useMemo(() => {
+    return statuses.slice(0, MAX_VISIBLE);
+  }, [statuses]);
+
+  const overflowStatuses = useMemo(() => {
+    return allKnownStatuses.filter((s) => !topStatuses.includes(s));
+  }, [allKnownStatuses, topStatuses]);
+
+  const isOverflowSelected = overflowStatuses.includes(filterStatus);
+
+  // Measure active pill position to animate sliding frosted glass thumb
+  useEffect(() => {
+    if (!pillTrackRef.current) return;
+    const activeBtn = pillTrackRef.current.querySelector<HTMLElement>(`[data-active="true"]`);
+    if (activeBtn) {
+      setThumbStyle((prev) => {
+        if (
+          prev.left === activeBtn.offsetLeft &&
+          prev.width === activeBtn.offsetWidth &&
+          prev.opacity === 1
+        ) {
+          return prev;
+        }
+        return {
+          left: activeBtn.offsetLeft,
+          width: activeBtn.offsetWidth,
+          opacity: 1,
+        };
+      });
+    } else {
+      setThumbStyle((prev) => (prev.opacity === 0 ? prev : { ...prev, opacity: 0 }));
+    }
+  }, [filterStatus, topStatuses, overflowStatuses]);
+
+  // Filtered jobs: match status AND search across company, role, notes, salary, location, deadline, and custom fields!
   const filteredJobs = jobs.filter((job) => {
     const matchesStatus = filterStatus === "All" || job.status === filterStatus;
     const query = searchQuery.toLowerCase().trim();
     const matchesSearch =
       !query ||
       job.company.toLowerCase().includes(query) ||
-      job.role.toLowerCase().includes(query);
+      job.role.toLowerCase().includes(query) ||
+      (job.notes && job.notes.toLowerCase().includes(query)) ||
+      (job.salary && job.salary.toLowerCase().includes(query)) ||
+      (job.location && job.location.toLowerCase().includes(query)) ||
+      (job.deadlineDate && job.deadlineDate.toLowerCase().includes(query)) ||
+      (job.customFields &&
+        Object.values(job.customFields).some((val) =>
+          val.toLowerCase().includes(query)
+        ));
     return matchesStatus && matchesSearch;
   });
 
@@ -222,11 +305,11 @@ export default function JobTable({
               onChange={(e) => onStatusChange(job.id, e.target.value as ApplicationStatus)}
               className="bg-zinc-800 text-zinc-200 text-xs px-2.5 py-1 rounded border border-zinc-700 outline-none cursor-pointer hover:border-zinc-500 transition-colors"
             >
-              <option value="Applied">Applied</option>
-              <option value="Interview">Interview</option>
-              <option value="Offer">Offer</option>
-              <option value="Rejected">Rejected</option>
-              <option value="Other">Other</option>
+              {allKnownStatuses.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
             </select>
           </td>
         );
@@ -320,21 +403,161 @@ export default function JobTable({
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-1.5 items-center">
-          {(["All", "Applied", "Interview", "Offer", "Rejected", "Other"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setFilterStatus(s)}
-              className={`text-xs px-3 py-1.5 rounded transition-colors cursor-pointer ${
-                filterStatus === s
-                  ? "bg-zinc-100 text-zinc-900 font-semibold"
-                  : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
+        {/* Segmented Status Pill Bar with iOS Sliding Frosted Glass Thumb */}
+        <div
+          ref={pillTrackRef}
+          className="relative inline-flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-1 max-w-full overflow-x-visible shadow-inner gap-0.5 shrink-0"
+        >
+          {/* iOS-Style Sliding Frosted Glass Thumb */}
+          <div
+            className="filter-slider-thumb absolute top-1 bottom-1 rounded-md bg-white/15 backdrop-blur-md border border-white/20 shadow-sm transition-all duration-200 ease-out pointer-events-none"
+            style={{
+              left: `${thumbStyle.left}px`,
+              width: `${thumbStyle.width}px`,
+              opacity: thumbStyle.opacity,
+            }}
+          />
+
+          {/* "All" button */}
+          <button
+            type="button"
+            data-active={filterStatus === "All" ? "true" : "false"}
+            onClick={() => setFilterStatus("All")}
+            className={`relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+              filterStatus === "All"
+                ? "text-[#f0f6fc] font-semibold"
+                : "text-[#8b949e] hover:text-[#c9d1d9]"
+            }`}
+          >
+            <span>All</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] leading-tight transition-colors ${
+                filterStatus === "All"
+                  ? "bg-[#30363d] text-[#f0f6fc] font-semibold"
+                  : "bg-[#161b22] text-[#8b949e]"
               }`}
             >
-              {s}
-            </button>
-          ))}
+              {statusCounts["All"] || 0}
+            </span>
+          </button>
+
+          {/* Top 4 visible statuses */}
+          {topStatuses.map((s) => {
+            const isSelected = filterStatus === s;
+            const count = statusCounts[s] || 0;
+
+            return (
+              <button
+                key={s}
+                type="button"
+                data-active={isSelected ? "true" : "false"}
+                onClick={() => setFilterStatus(s)}
+                className={`relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                  isSelected
+                    ? "text-[#f0f6fc] font-semibold"
+                    : "text-[#8b949e] hover:text-[#c9d1d9]"
+                }`}
+              >
+                <span>{s}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] leading-tight transition-colors ${
+                    isSelected
+                      ? "bg-[#30363d] text-[#f0f6fc] font-semibold"
+                      : "bg-[#161b22] text-[#8b949e]"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+
+          {/* "More ▾" Overflow Dropdown */}
+          {overflowStatuses.length > 0 && (
+            <div className="relative z-10" ref={moreRef}>
+              <button
+                type="button"
+                data-active={isOverflowSelected ? "true" : "false"}
+                onClick={() => setIsMoreOpen(!isMoreOpen)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                  isOverflowSelected
+                    ? "text-[#58a6ff] font-semibold"
+                    : "text-[#8b949e] hover:text-[#c9d1d9]"
+                }`}
+                title="More status filters"
+              >
+                <span>
+                  {isOverflowSelected ? filterStatus : "More"}
+                </span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] leading-tight transition-colors ${
+                    isOverflowSelected
+                      ? "bg-[#58a6ff]/20 text-[#58a6ff]"
+                      : "bg-[#161b22] text-[#8b949e]"
+                  }`}
+                >
+                  {isOverflowSelected
+                    ? statusCounts[filterStatus] || 0
+                    : overflowStatuses.reduce(
+                        (acc, s) => acc + (statusCounts[s] || 0),
+                        0
+                      )}
+                </span>
+                <svg
+                  className={`w-3 h-3 transition-transform duration-150 ${
+                    isMoreOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Popover Dropdown Menu */}
+              {isMoreOpen && (
+                <div className="absolute right-0 top-full mt-1.5 z-40 min-w-[170px] bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl p-1 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-2 py-1 text-[10px] uppercase font-semibold text-[#8b949e] tracking-wider border-b border-[#30363d]/60 mb-1">
+                    Other Statuses
+                  </div>
+                  <div className="space-y-0.5 max-h-56 overflow-y-auto">
+                    {overflowStatuses.map((s) => {
+                      const isSelected = filterStatus === s;
+                      const count = statusCounts[s] || 0;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => {
+                            setFilterStatus(s);
+                            setIsMoreOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer ${
+                            isSelected
+                              ? "bg-[#21262d] text-[#58a6ff] font-medium"
+                              : "text-[#c9d1d9] hover:bg-[#21262d]/70 hover:text-white"
+                          }`}
+                        >
+                          <span className="truncate mr-2">{s}</span>
+                          <span
+                            className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full ${
+                              isSelected
+                                ? "bg-[#58a6ff]/20 text-[#58a6ff]"
+                                : "bg-[#0d1117] text-[#8b949e]"
+                            }`}
+                          >
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -368,8 +591,8 @@ export default function JobTable({
                         const rect = e.currentTarget.getBoundingClientRect();
                         const midpoint = rect.left + rect.width / 2;
                         const side = e.clientX < midpoint ? "left" : "right";
-                        setDragOverColId(colId);
-                        setDragOverSide(side);
+                        setDragOverColId((prev) => (prev !== colId ? colId : prev));
+                        setDragOverSide((prev) => (prev !== side ? side : prev));
                       }
                     }}
                     onDragLeave={(e) => {

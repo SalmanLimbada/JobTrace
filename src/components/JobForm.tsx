@@ -20,7 +20,7 @@ interface JobFormProps {
 }
 
 export default function JobForm({ onAddJob }: JobFormProps) {
-  const { customFields } = useSettings();
+  const { customFields, statuses } = useSettings();
   const activeFields = customFields.filter((f) => f.enabled);
 
   const [company, setCompany] = useState("");
@@ -110,11 +110,11 @@ export default function JobForm({ onAddJob }: JobFormProps) {
           onChange={(e) => setStatus(e.target.value as ApplicationStatus)}
           className="bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors cursor-pointer"
         >
-          <option value="Applied">Applied</option>
-          <option value="Interview">Interview</option>
-          <option value="Offer">Offer</option>
-          <option value="Rejected">Rejected</option>
-          <option value="Other">Other</option>
+          {statuses.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
         </select>
 
         <input
