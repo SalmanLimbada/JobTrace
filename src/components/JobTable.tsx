@@ -1,8 +1,10 @@
 "use client";
+
 import { useState } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { exportApplicationsToCSV } from "@/lib/csv";
 import CSVImportModal from "@/components/CSVImportModal";
+import EditJobModal from "@/components/EditJobModal";
 import { useSettings } from "@/context/SettingsContext";
 
 interface JobTableProps {
@@ -46,11 +48,10 @@ export default function JobTable({
 }: JobTableProps) {
   const { customFields } = useSettings();
   const activeFields = customFields.filter((f) => f.enabled);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<ApplicationStatus | "All">("All");
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<JobApplication>>({});
+  const [editingJob, setEditingJob] = useState<JobApplication | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const filteredJobs = jobs.filter((job) => {
@@ -62,75 +63,6 @@ export default function JobTable({
       job.role.toLowerCase().includes(query);
     return matchesStatus && matchesSearch;
   });
-
-  function startEditing(job: JobApplication) {
-    setEditingId(job.id);
-    const initialCustom: Record<string, string> = { ...(job.customFields || {}) };
-    if (job.salary && !initialCustom.salary) initialCustom.salary = job.salary;
-    if (job.location && !initialCustom.location) initialCustom.location = job.location;
-    if (job.deadlineDate && !initialCustom.deadlineDate) initialCustom.deadlineDate = job.deadlineDate;
-
-    setEditForm({
-      company: job.company,
-      role: job.role,
-      status: job.status,
-      appliedDate: job.appliedDate,
-      url: job.url,
-      notes: job.notes,
-      salary: job.salary,
-      location: job.location,
-      deadlineDate: job.deadlineDate,
-      customFields: initialCustom,
-    });
-  }
-
-  function cancelEditing() {
-    setEditingId(null);
-    setEditForm({});
-  }
-
-  function handleEditCustomField(fieldId: string, value: string) {
-    setEditForm((prev) => {
-      const nextCustom = { ...(prev.customFields || {}), [fieldId]: value };
-      const next: Partial<JobApplication> = {
-        ...prev,
-        customFields: nextCustom,
-      };
-      if (fieldId === "salary") next.salary = value;
-      if (fieldId === "location") next.location = value;
-      if (fieldId === "deadlineDate") next.deadlineDate = value;
-      return next;
-    });
-  }
-
-  function handleSave(id: string) {
-    if (!editForm.company?.trim() || !editForm.role?.trim()) return;
-
-    onSaveEdit(id, {
-      company: editForm.company.trim(),
-      role: editForm.role.trim(),
-      status: editForm.status,
-      appliedDate: editForm.appliedDate,
-      url: editForm.url?.trim() || "#",
-      notes: editForm.notes?.trim() || "",
-      salary: editForm.salary || editForm.customFields?.["salary"],
-      location: editForm.location || editForm.customFields?.["location"],
-      deadlineDate: editForm.deadlineDate || editForm.customFields?.["deadlineDate"],
-      customFields: editForm.customFields,
-    });
-
-    setEditingId(null);
-    setEditForm({});
-  }
-
-  function handleDelete(job: JobApplication) {
-    if (confirm(`Delete application for ${job.company} (${job.role})?`)) {
-      onDeleteJob(job.id);
-      if (editingId === job.id) {
-        cancelEditing();
-      }
-    }
-  }
 
   return (
     <div>
@@ -196,6 +128,7 @@ export default function JobTable({
         <table className="w-full text-left">
           <thead className="bg-zinc-900/90 text-zinc-400 text-xs uppercase font-medium border-b border-zinc-800">
             <tr>
+              <th className="w-8 p-0"></th>
               <th className="p-3.5">Company</th>
               <th className="p-3.5">Role</th>
               <th className="p-3.5">Status</th>
@@ -207,7 +140,6 @@ export default function JobTable({
               ))}
               <th className="p-3.5">Posting URL</th>
               <th className="p-3.5">Notes</th>
-              <th className="p-3.5">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -233,174 +165,98 @@ export default function JobTable({
                 </td>
               </tr>
             ) : (
-              filteredJobs.map((job) => {
-                const isEditing = editingId === job.id;
-
-                if (isEditing) {
-                  return (
-                    <tr key={job.id} className="border-b border-zinc-700 bg-zinc-900/60">
-                      <td className="p-3">
-                        <input
-                          type="text"
-                          value={editForm.company ?? ""}
-                          onChange={(e) => setEditForm((prev) => ({ ...prev, company: e.target.value }))}
-                          className="bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:border-zinc-400 w-full"
-                          required
-                        />
-                      </td>
-                      <td className="p-3">
-                        <input
-                          type="text"
-                          value={editForm.role ?? ""}
-                          onChange={(e) => setEditForm((prev) => ({ ...prev, role: e.target.value }))}
-                          className="bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:border-zinc-400 w-full"
-                          required
-                        />
-                      </td>
-                      <td className="p-3">
-                        <select
-                          value={editForm.status ?? job.status}
-                          onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value as ApplicationStatus }))}
-                          className="bg-zinc-950 border border-zinc-700 text-zinc-200 text-xs px-2 py-1 rounded outline-none focus:border-zinc-400 cursor-pointer"
-                        >
-                          <option value="Applied">Applied</option>
-                          <option value="Interview">Interview</option>
-                          <option value="Offer">Offer</option>
-                          <option value="Rejected">Rejected</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </td>
-                      <td className="p-3">
-                        <input
-                          type="date"
-                          value={editForm.appliedDate ?? job.appliedDate}
-                          onChange={(e) => setEditForm((prev) => ({ ...prev, appliedDate: e.target.value }))}
-                          className="bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:border-zinc-400"
-                        />
-                      </td>
-                      {activeFields.map((f) => (
-                        <td key={f.id} className="p-3">
-                          <input
-                            type={f.type === "date" ? "date" : f.type === "number" ? "number" : "text"}
-                            value={editForm.customFields?.[f.id] ?? getFieldValue(job, f.id) ?? ""}
-                            onChange={(e) => handleEditCustomField(f.id, e.target.value)}
-                            placeholder={f.name}
-                            className="bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:border-zinc-400 w-full"
-                          />
-                        </td>
-                      ))}
-                      <td className="p-3">
-                        <input
-                          type="text"
-                          value={editForm.url ?? ""}
-                          onChange={(e) => setEditForm((prev) => ({ ...prev, url: e.target.value }))}
-                          placeholder="Posting URL"
-                          className="bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:border-zinc-400 w-full"
-                        />
-                      </td>
-                      <td className="p-3">
-                        <input
-                          type="text"
-                          value={editForm.notes ?? ""}
-                          onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
-                          placeholder="Notes"
-                          className="bg-zinc-950 border border-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:border-zinc-400 w-full"
-                        />
-                      </td>
-                      <td className="p-3 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => handleSave(job.id)}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-2.5 py-1 rounded transition-colors mr-1.5 cursor-pointer"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelEditing}
-                          className="text-zinc-400 hover:text-zinc-200 text-xs px-2 py-1 rounded hover:bg-zinc-800 transition-colors cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                }
-
-                return (
-                  <tr key={job.id} className="border-b border-zinc-800/80 hover:bg-zinc-800/30 transition-colors">
-                    <td className="p-3 font-medium text-zinc-100">{job.company}</td>
-                    <td className="p-3 text-zinc-300">{job.role}</td>
-                    <td className="p-3">
-                      <select
-                        value={job.status}
-                        onChange={(e) => onStatusChange(job.id, e.target.value as ApplicationStatus)}
-                        className="bg-zinc-800 text-zinc-200 text-xs px-2.5 py-1 rounded border border-zinc-700 outline-none cursor-pointer hover:border-zinc-500 transition-colors"
+              filteredJobs.map((job) => (
+                <tr
+                  key={job.id}
+                  className="group border-b border-zinc-800/80 hover:bg-zinc-800/30 transition-colors"
+                >
+                  {/* Left-edge Hover Slide-Out Pencil */}
+                  <td className="w-8 p-0 text-center relative">
+                    <button
+                      type="button"
+                      onClick={() => setEditingJob(job)}
+                      title="Edit application"
+                      className="opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 text-zinc-400 hover:text-[#58a6ff] p-1.5 rounded hover:bg-zinc-800 cursor-pointer inline-flex items-center justify-center"
+                    >
+                      <svg
+                        className="w-3.5 h-3.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
                       >
-                        <option value="Applied">Applied</option>
-                        <option value="Interview">Interview</option>
-                        <option value="Offer">Offer</option>
-                        <option value="Rejected">Rejected</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </td>
-                    <td className="p-3 text-zinc-400 text-xs">{job.appliedDate}</td>
-                    {activeFields.map((f) => {
-                      const val = getFieldValue(job, f.id);
-                      return (
-                        <td
-                          key={f.id}
-                          className={`p-3 text-xs ${
-                            f.type === "date" ? "text-zinc-400 font-mono" : "text-zinc-300"
-                          }`}
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                        />
+                      </svg>
+                    </button>
+                  </td>
+
+                  <td className="p-3 font-medium text-zinc-100">{job.company}</td>
+                  <td className="p-3 text-zinc-300">{job.role}</td>
+                  <td className="p-3">
+                    <select
+                      value={job.status}
+                      onChange={(e) => onStatusChange(job.id, e.target.value as ApplicationStatus)}
+                      className="bg-zinc-800 text-zinc-200 text-xs px-2.5 py-1 rounded border border-zinc-700 outline-none cursor-pointer hover:border-zinc-500 transition-colors"
+                    >
+                      <option value="Applied">Applied</option>
+                      <option value="Interview">Interview</option>
+                      <option value="Offer">Offer</option>
+                      <option value="Rejected">Rejected</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </td>
+                  <td className="p-3 text-zinc-400 text-xs">{job.appliedDate}</td>
+                  {activeFields.map((f) => {
+                    const val = getFieldValue(job, f.id);
+                    return (
+                      <td
+                        key={f.id}
+                        className={`p-3 text-xs ${
+                          f.type === "date" ? "text-zinc-400 font-mono" : "text-zinc-300"
+                        }`}
+                      >
+                        {val || <span className="text-zinc-600">—</span>}
+                      </td>
+                    );
+                  })}
+                  <td className="p-3">
+                    {(() => {
+                      const validUrl = formatUrl(job.url);
+                      return validUrl ? (
+                        <a
+                          href={validUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 hover:underline text-xs inline-flex items-center gap-1 font-medium"
                         >
-                          {val || <span className="text-zinc-600">—</span>}
-                        </td>
+                          View Post ↗
+                        </a>
+                      ) : (
+                        <span className="text-zinc-600 text-xs font-mono">—</span>
                       );
-                    })}
-                    <td className="p-3">
-                      {(() => {
-                        const validUrl = formatUrl(job.url);
-                        return validUrl ? (
-                          <a
-                            href={validUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 hover:underline text-xs inline-flex items-center gap-1 font-medium"
-                          >
-                            View Post ↗
-                          </a>
-                        ) : (
-                          <span className="text-zinc-600 text-xs font-mono">—</span>
-                        );
-                      })()}
-                    </td>
-                    <td className="p-3 text-zinc-400 text-xs max-w-xs truncate" title={job.notes}>
-                      {job.notes || <span className="text-zinc-600">—</span>}
-                    </td>
-                    <td className="p-3 whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => startEditing(job)}
-                        className="text-zinc-400 hover:text-zinc-100 text-xs px-2.5 py-1 rounded hover:bg-zinc-800 transition-colors mr-1.5 cursor-pointer"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(job)}
-                        className="text-zinc-500 hover:text-red-400 text-xs px-2.5 py-1 rounded hover:bg-red-950/30 transition-colors cursor-pointer"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
+                    })()}
+                  </td>
+                  <td className="p-3 text-zinc-400 text-xs max-w-xs truncate" title={job.notes}>
+                    {job.notes || <span className="text-zinc-600">—</span>}
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
+
+      <EditJobModal
+        job={editingJob}
+        isOpen={!!editingJob}
+        onClose={() => setEditingJob(null)}
+        onSave={onSaveEdit}
+        onDelete={onDeleteJob}
+      />
 
       <CSVImportModal
         isOpen={isImportModalOpen}
