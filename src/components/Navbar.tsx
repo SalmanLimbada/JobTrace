@@ -1,24 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import AuthModal from "@/components/AuthModal";
 import SettingsModal from "@/components/SettingsModal";
+import AccountModal from "@/components/AccountModal";
 
 export default function Navbar() {
   const { user, signOut, isLoading } = useAuth();
   const { theme, setTheme, isSettingsOpen, setIsSettingsOpen } = useSettings();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [accountModalTab, setAccountModalTab] = useState<"email" | "password">("email");
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    }
+    if (isProfileOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isProfileOpen]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && isProfileOpen) {
+        setIsProfileOpen(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isProfileOpen]);
 
   return (
     <>
       <header className="border-b border-[#30363d] bg-[#161b22] sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 sm:px-8 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 select-none">
             <svg
               className="h-6 w-6 shrink-0"
-              viewBox="0 0 64 64"
+              viewBox="0 4 64 64"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
@@ -74,7 +103,7 @@ export default function Navbar() {
                 strokeLinejoin="round"
               />
             </svg>
-            <span className="font-bold text-base text-[#f0f6fc] tracking-tight">
+            <span className="font-bold text-base text-[#f0f6fc] tracking-tight leading-none translate-y-px">
               JobTrace
             </span>
           </div>
@@ -145,16 +174,93 @@ export default function Navbar() {
             {isLoading ? (
               <div className="h-7 w-16 rounded-md bg-[#21262d] animate-pulse" />
             ) : user ? (
-              <div className="flex items-center gap-2.5">
-                <span className="text-xs text-[#8b949e] bg-[#21262d] border border-[#30363d] px-2.5 py-1 rounded-md hidden sm:inline-block">
-                  {user.email}
-                </span>
+              <div className="relative" ref={profileRef}>
                 <button
-                  onClick={() => signOut()}
-                  className="text-xs font-medium text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] px-3 py-1.5 rounded-md transition-colors"
+                  type="button"
+                  onClick={() => setIsProfileOpen((prev) => !prev)}
+                  className="flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-md text-xs font-medium text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] transition-colors cursor-pointer select-none"
+                  aria-expanded={isProfileOpen}
+                  aria-haspopup="true"
                 >
-                  Sign Out
+                  <span className="w-5 h-5 rounded-full bg-[#58a6ff]/20 text-[#58a6ff] border border-[#58a6ff]/30 flex items-center justify-center font-bold text-[10px] shrink-0 uppercase">
+                    {user.email ? user.email[0] : "U"}
+                  </span>
+                  <span className="max-w-[130px] sm:max-w-[180px] truncate text-left">
+                    {user.email}
+                  </span>
+                  <svg
+                    className={`w-3.5 h-3.5 text-[#8b949e] transition-transform duration-150 ${
+                      isProfileOpen ? "rotate-180" : ""
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
+
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[#161b22] border border-[#30363d] shadow-2xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-3.5 py-2.5 border-b border-[#30363d]/80">
+                      <p className="text-[10px] font-semibold text-[#8b949e] uppercase tracking-wider">
+                        Signed in as
+                      </p>
+                      <p className="text-xs font-medium text-[#f0f6fc] truncate mt-0.5">
+                        {user.email}
+                      </p>
+                    </div>
+
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          setAccountModalTab("email");
+                          setIsAccountModalOpen(true);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors cursor-pointer text-left"
+                      >
+                        <svg className="w-4 h-4 text-[#8b949e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Change Email
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          setAccountModalTab("password");
+                          setIsAccountModalOpen(true);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors cursor-pointer text-left"
+                      >
+                        <svg className="w-4 h-4 text-[#8b949e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Change Password
+                      </button>
+                    </div>
+
+                    <div className="border-t border-[#30363d]/80 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          signOut();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#f85149] hover:bg-[#da3633]/15 hover:text-[#ff7b72] transition-colors cursor-pointer text-left font-medium"
+                      >
+                        <svg className="w-4 h-4 text-[#f85149]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <button
@@ -172,6 +278,11 @@ export default function Navbar() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+      <AccountModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        defaultTab={accountModalTab}
       />
     </>
   );
