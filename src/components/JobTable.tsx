@@ -5,6 +5,7 @@ import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { exportApplicationsToCSV } from "@/lib/csv";
 import CSVImportModal from "@/components/CSVImportModal";
 import EditJobModal from "@/components/EditJobModal";
+import ExportCSVModal from "@/components/ExportCSVModal";
 import {
   useSettings,
   STANDARD_COLUMN_NAMES,
@@ -67,6 +68,7 @@ export default function JobTable({
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [editingJob, setEditingJob] = useState<JobApplication | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -448,7 +450,7 @@ export default function JobTable({
                   type="button"
                   onClick={() => {
                     setIsActionsOpen(false);
-                    exportApplicationsToCSV(jobs, customFields);
+                    setIsExportModalOpen(true);
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] rounded-md transition-colors text-left cursor-pointer"
                 >
@@ -456,8 +458,8 @@ export default function JobTable({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                   <div>
-                    <span className="font-medium block">Export CSV</span>
-                    <span className="text-[10px] text-[#8b949e] block">Download all applications</span>
+                    <span className="font-medium block">Export Applications</span>
+                    <span className="text-[10px] text-[#8b949e] block">Download as CSV or Excel</span>
                   </div>
                 </button>
               </div>
@@ -785,6 +787,14 @@ export default function JobTable({
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={onImportJobs}
+      />
+
+      <ExportCSVModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        allJobs={jobs}
+        filteredJobs={sortedJobs}
+        customFields={customFields}
       />
     </div>
   );

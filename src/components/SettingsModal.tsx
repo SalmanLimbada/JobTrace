@@ -12,16 +12,23 @@ import {
   type StandardColumnsSettings,
   type ShortcutSettings,
 } from "@/context/SettingsContext";
-import type { CustomFieldDefinition, CustomFieldType } from "@/types/job";
+import type { CustomFieldDefinition, CustomFieldType, JobApplication } from "@/types/job";
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  jobs?: JobApplication[];
+  onMigrateStatus?: (oldStatus: string, newStatus: string) => void | Promise<void>;
 }
 
 type SettingsTab = "general" | "statuses" | "columns" | "shortcuts";
 
-export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export default function SettingsModal({
+  isOpen,
+  onClose,
+  jobs = [],
+  onMigrateStatus,
+}: SettingsModalProps) {
   const {
     standardColumns,
     showRowNumbers,
@@ -50,6 +57,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [dragOverSide, setDragOverSide] = useState<"above" | "below">("above");
 
+  // Migration state when deleting a status that is currently assigned to jobs
+  const [statusToDelete, setStatusToDelete] = useState<{ name: string; count: number } | null>(null);
+  const [migrationTargetStatus, setMigrationTargetStatus] = useState<string>("");
+
   // Re-sync draft state from context when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -61,6 +72,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setNewFieldName("");
       setNewStatusName("");
       setRecordingShortcut(null);
+      setStatusToDelete(null);
+      setMigrationTargetStatus("");
     }
   }, [isOpen, showRowNumbers, standardColumns, statuses, customFields, shortcuts]);
 
@@ -170,7 +183,25 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   function handleRemoveStatus(name: string) {
     if (draftStatuses.length <= 1) return;
+    const matchingCount = jobs.filter((j) => j.status === name).length;
+    if (matchingCount > 0) {
+      // Find candidate target from other available statuses
+      const candidate = draftStatuses.find((s) => s !== name) || "Applied";
+      setMigrationTargetStatus(candidate);
+      setStatusToDelete({ name, count: matchingCount });
+      return;
+    }
+    // No active jobs use this status -> delete immediately
     setDraftStatuses((prev) => prev.filter((s) => s !== name));
+  }
+
+  async function confirmStatusMigration() {
+    if (!statusToDelete || !migrationTargetStatus) return;
+    if (onMigrateStatus) {
+      await onMigrateStatus(statusToDelete.name, migrationTargetStatus);
+    }
+    setDraftStatuses((prev) => prev.filter((s) => s !== statusToDelete.name));
+    setStatusToDelete(null);
   }
 
   function handleResetStatuses() {
@@ -405,6 +436,52 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   + Add Status
                 </button>
               </form>
+
+              {/* Status Migration Prompt (when deleting a status currently used by jobs) */}
+              {statusToDelete && (
+                <div className="p-3.5 bg-[#f85149]/10 border border-[#f85149]/30 rounded-xl space-y-2.5 animate-in fade-in duration-150">
+                  <div className="flex items-start gap-2">
+                    <span className="text-sm shrink-0">⚠️</span>
+                    <div>
+                      <p className="text-xs font-semibold text-[#f0f6fc]">
+                        Status &quot;{statusToDelete.name}&quot; is in use
+                      </p>
+                      <p className="text-[11px] text-[#8b949e] mt-0.5">
+                        <strong className="text-[#f0f6fc] font-mono">{statusToDelete.count}</strong> application{statusToDelete.count > 1 ? "s are" : " is"} currently set to this status. Choose where to move them before deleting:
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <select
+                      value={migrationTargetStatus}
+                      onChange={(e) => setMigrationTargetStatus(e.target.value)}
+                      className="flex-1 bg-[#0d1117] border border-[#30363d] text-xs text-[#f0f6fc] rounded-lg px-2.5 py-1.5 outline-none focus:border-[#58a6ff]"
+                    >
+                      {draftStatuses
+                        .filter((s) => s !== statusToDelete.name)
+                        .map((s) => (
+                          <option key={s} value={s}>
+                            Move to {s}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setStatusToDelete(null)}
+                      className="px-2.5 py-1.5 text-xs text-[#8b949e] hover:text-[#c9d1d9] bg-[#21262d] rounded-lg transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmStatusMigration}
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-[#da3633] hover:bg-[#b62324] rounded-lg transition-colors cursor-pointer"
+                    >
+                      Migrate & Delete
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Status List with 6-dot Drag Handle */}
               <div className="space-y-1.5">

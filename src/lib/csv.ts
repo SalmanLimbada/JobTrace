@@ -68,12 +68,108 @@ export function exportApplicationsToCSV(
     ];
   });
 
-  const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   const downloadUrl = URL.createObjectURL(blob);
   link.href = downloadUrl;
   link.download = `job-applications-${new Date().toISOString().split("T")[0]}.csv`;
+  link.click();
+  URL.revokeObjectURL(downloadUrl);
+}
+
+export function exportApplicationsToExcel(
+  jobs: JobApplication[],
+  customFields?: CustomFieldDefinition[]
+): void {
+  const activeCustom = (customFields || []).filter((f) => f.enabled);
+  const headers = [
+    "Company",
+    "Role",
+    "Status",
+    "Date Applied",
+    ...activeCustom.map((f) => f.name),
+    "Posting URL",
+    "Notes",
+  ];
+
+  const escapeXml = (str: string) =>
+    (str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+
+  const headerCells = headers
+    .map(
+      (h) =>
+        `<Cell ss:StyleID="Header"><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`
+    )
+    .join("");
+
+  const rowsXml = jobs
+    .map((job) => {
+      const customValues = activeCustom.map((f) => {
+        let val = job.customFields?.[f.id];
+        if (val === undefined) {
+          if (f.id === "salary") val = job.salary;
+          else if (f.id === "location") val = job.location;
+          else if (f.id === "deadlineDate") val = job.deadlineDate;
+        }
+        return val || "";
+      });
+
+      const cellValues = [
+        job.company,
+        job.role,
+        job.status,
+        job.appliedDate,
+        ...customValues,
+        job.url,
+        job.notes,
+      ];
+
+      const cells = cellValues
+        .map(
+          (val) =>
+            `<Cell><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`
+        )
+        .join("");
+
+      return `<Row>${cells}</Row>`;
+    })
+    .join("\n");
+
+  const xml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Header">
+   <Font ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#161B22" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#30363D"/>
+   </Borders>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Applications">
+  <Table>
+   <Row>${headerCells}</Row>
+   ${rowsXml}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+  const blob = new Blob([xml], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = `job-applications-${new Date().toISOString().split("T")[0]}.xls`;
   link.click();
   URL.revokeObjectURL(downloadUrl);
 }

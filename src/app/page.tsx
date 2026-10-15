@@ -340,9 +340,41 @@ export default function Home() {
     }
   }
 
+  async function handleMigrateStatus(oldStatus: string, newStatus: string) {
+    const nextJobs = { ...jobs };
+    let hasChanges = false;
+    for (const id in nextJobs) {
+      if (nextJobs[id].status === oldStatus) {
+        nextJobs[id] = { ...nextJobs[id], status: newStatus as ApplicationStatus };
+        hasChanges = true;
+      }
+    }
+    if (!hasChanges) return;
+    setJobs(nextJobs);
+
+    if (!user) {
+      saveGuestJobs(nextJobs);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("applications")
+        .update({ status: newStatus })
+        .eq("status", oldStatus)
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("Error migrating status in database:", error.message);
+      }
+    } catch (err) {
+      console.error("Failed to migrate status in database:", err);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] flex flex-col">
-      <Navbar />
+      <Navbar jobs={jobList} onMigrateStatus={handleMigrateStatus} />
 
       <main className="p-4 sm:p-8 max-w-5xl mx-auto w-full flex-1">
         {/* Guest Mode Banner */}

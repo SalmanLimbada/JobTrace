@@ -6,8 +6,14 @@ import { useSettings } from "@/context/SettingsContext";
 import AuthModal from "@/components/AuthModal";
 import SettingsModal from "@/components/SettingsModal";
 import AccountModal from "@/components/AccountModal";
+import type { JobApplication } from "@/types/job";
 
-export default function Navbar() {
+interface NavbarProps {
+  jobs?: JobApplication[];
+  onMigrateStatus?: (oldStatus: string, newStatus: string) => void | Promise<void>;
+}
+
+export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
   const { user, signOut, isLoading } = useAuth();
   const { theme, setTheme, isSettingsOpen, setIsSettingsOpen } = useSettings();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -278,6 +284,8 @@ export default function Navbar() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        jobs={jobs}
+        onMigrateStatus={onMigrateStatus}
       />
       <AccountModal
         isOpen={isAccountModalOpen}
