@@ -240,14 +240,14 @@ export default function SettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-2 sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-2xl rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl flex flex-col overflow-hidden max-h-[85vh] animate-in fade-in zoom-in-95 duration-150">
+      <div className="w-full max-w-2xl rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl flex flex-col overflow-hidden max-h-[92vh] sm:max-h-[85vh] animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-[#30363d]">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-[#30363d]">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-[#21262d] border border-[#30363d] flex items-center justify-center text-[#58a6ff]">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -274,11 +274,11 @@ export default function SettingsModal({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center px-6 border-b border-[#30363d] bg-[#0d1117] gap-3 overflow-x-auto">
+        <div className="flex items-center px-3 sm:px-6 border-b border-[#30363d] bg-[#0d1117] gap-1 sm:gap-3 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab("general")}
-            className={`px-4 py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+            className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === "general"
                 ? "border-[#58a6ff] text-[#f0f6fc]"
                 : "border-transparent text-[#8b949e] hover:text-[#c9d1d9]"
@@ -289,7 +289,7 @@ export default function SettingsModal({
           <button
             type="button"
             onClick={() => setActiveTab("statuses")}
-            className={`px-4 py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+            className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === "statuses"
                 ? "border-[#58a6ff] text-[#f0f6fc]"
                 : "border-transparent text-[#8b949e] hover:text-[#c9d1d9]"
@@ -825,8 +825,8 @@ export default function SettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-t border-[#30363d] bg-[#161b22]">
-          <div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between px-4 sm:px-6 py-3 border-t border-[#30363d] bg-[#161b22] gap-2.5 sm:gap-0 shrink-0">
+          <div className="flex items-center justify-between sm:justify-start">
             {isDirty ? (
               <span className="text-xs text-amber-400 flex items-center gap-1.5 font-medium">
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
@@ -839,7 +839,7 @@ export default function SettingsModal({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
@@ -851,7 +851,7 @@ export default function SettingsModal({
               type="button"
               onClick={handleSave}
               disabled={!isDirty}
-              className={`text-xs font-semibold px-4 py-2 rounded-md transition-all shadow-xs flex items-center gap-1.5 ${
+              className={`text-xs font-semibold px-4 py-2 rounded-md transition-all shadow-xs flex items-center justify-center gap-1.5 ${
                 isDirty
                   ? "bg-[#238636] hover:bg-[#2ea043] text-white cursor-pointer"
                   : "bg-[#21262d] text-[#8b949e] opacity-60 cursor-not-allowed"

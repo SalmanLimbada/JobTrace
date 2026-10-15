@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import type { ApplicationStatus, JobApplication } from "@/types/job";
+import type { ApplicationStatus, JobApplication, JobHighlights } from "@/types/job";
 import StatsBanner from "@/components/StatsBanner";
 import JobForm, { type NewJobPayload } from "@/components/JobForm";
 import JobTable from "@/components/JobTable";
@@ -54,20 +54,26 @@ export default function Home() {
         const guestList = Object.values(parsedGuest);
 
         if (guestList.length > 0) {
-          const rowsToMigrate = guestList.map((job) => ({
-            id: job.id,
-            user_id: user.id,
-            company: job.company,
-            role: job.role,
-            status: job.status,
-            applied_date: job.appliedDate,
-            url: job.url,
-            notes: job.notes,
-            salary: job.salary || "",
-            location: job.location || "",
-            deadline_date: job.deadlineDate || "",
-            custom_fields: job.customFields || {},
-          }));
+          const rowsToMigrate = guestList.map((job) => {
+            const mergedCustom: Record<string, unknown> = { ...(job.customFields || {}) };
+            if (job.highlights) {
+              mergedCustom._highlights = JSON.stringify(job.highlights);
+            }
+            return {
+              id: job.id,
+              user_id: user.id,
+              company: job.company,
+              role: job.role,
+              status: job.status,
+              applied_date: job.appliedDate,
+              url: job.url,
+              notes: job.notes,
+              salary: job.salary || "",
+              location: job.location || "",
+              deadline_date: job.deadlineDate || "",
+              custom_fields: mergedCustom,
+            };
+          });
 
           let { error: migError } = await supabase.from("applications").insert(rowsToMigrate);
           if (migError && migError.message?.includes("custom_fields")) {
@@ -96,6 +102,24 @@ export default function Home() {
       if (data) {
         const map: Record<string, JobApplication> = {};
         for (const row of data) {
+          let parsedHighlights: JobHighlights | undefined = undefined;
+          let cleanedCustomFields: Record<string, string> | undefined = undefined;
+
+          if (row.custom_fields && typeof row.custom_fields === "object") {
+            const cf = { ...row.custom_fields };
+            if (cf._highlights) {
+              try {
+                parsedHighlights = JSON.parse(cf._highlights);
+              } catch {
+                // ignore
+              }
+              delete cf._highlights;
+            }
+            if (Object.keys(cf).length > 0) {
+              cleanedCustomFields = cf;
+            }
+          }
+
           map[row.id] = {
             id: row.id,
             userId: row.user_id,
@@ -108,7 +132,8 @@ export default function Home() {
             salary: row.salary || undefined,
             location: row.location || undefined,
             deadlineDate: row.deadline_date || undefined,
-            customFields: row.custom_fields || undefined,
+            customFields: cleanedCustomFields,
+            highlights: parsedHighlights,
           };
         }
         setJobs(map);
@@ -150,6 +175,7 @@ export default function Home() {
       location: payload.location,
       deadlineDate: payload.deadlineDate,
       customFields: payload.customFields,
+      highlights: payload.highlights,
     };
 
     // Update state immediately
@@ -177,7 +203,14 @@ export default function Home() {
       if (payload.salary) dbRow.salary = payload.salary;
       if (payload.location) dbRow.location = payload.location;
       if (payload.deadlineDate) dbRow.deadline_date = payload.deadlineDate;
-      if (payload.customFields) dbRow.custom_fields = payload.customFields;
+
+      if (payload.customFields || payload.highlights) {
+        const mergedCustom: Record<string, unknown> = { ...(payload.customFields || {}) };
+        if (payload.highlights) {
+          mergedCustom._highlights = JSON.stringify(payload.highlights);
+        }
+        dbRow.custom_fields = mergedCustom;
+      }
 
       let { error } = await supabase.from("applications").insert([dbRow]);
       if (error && error.message?.includes("custom_fields")) {
@@ -248,7 +281,19 @@ export default function Home() {
       if (updated.salary !== undefined) dbPayload.salary = updated.salary;
       if (updated.location !== undefined) dbPayload.location = updated.location;
       if (updated.deadlineDate !== undefined) dbPayload.deadline_date = updated.deadlineDate;
-      if (updated.customFields !== undefined) dbPayload.custom_fields = updated.customFields;
+
+      if (updated.customFields !== undefined || updated.highlights !== undefined) {
+        const mergedCustom: Record<string, unknown> = {
+          ...(jobs[id]?.customFields || {}),
+          ...(updated.customFields || {}),
+        };
+        const highlightsToSave =
+          updated.highlights !== undefined ? updated.highlights : jobs[id]?.highlights;
+        if (highlightsToSave) {
+          mergedCustom._highlights = JSON.stringify(highlightsToSave);
+        }
+        dbPayload.custom_fields = mergedCustom;
+      }
 
       let { error } = await supabase
         .from("applications")

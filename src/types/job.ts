@@ -9,6 +9,18 @@ export interface CustomFieldDefinition {
   enabled: boolean;
 }
 
+export interface InterviewRoundNotes {
+  id: string;
+  round: string;
+  bullets: string[];
+}
+
+export interface JobHighlights {
+  requirements: string[];
+  techStack: string[];
+  interviewNotes: InterviewRoundNotes[];
+}
+
 export interface JobApplication {
   id: string;
   userId?: string;
@@ -19,6 +31,7 @@ export interface JobApplication {
   status: ApplicationStatus;
   notes: string;
   customFields?: Record<string, string>;
+  highlights?: JobHighlights;
   salary?: string;
   location?: string;
   deadlineDate?: string;

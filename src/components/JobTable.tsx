@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import type { ApplicationStatus, JobApplication } from "@/types/job";
+import type { ApplicationStatus, JobApplication, JobHighlights } from "@/types/job";
 import { exportApplicationsToCSV } from "@/lib/csv";
 import CSVImportModal from "@/components/CSVImportModal";
 import EditJobModal from "@/components/EditJobModal";
 import ExportCSVModal from "@/components/ExportCSVModal";
+import HighlightsVaultDrawer from "@/components/HighlightsVaultDrawer";
 import {
   useSettings,
   STANDARD_COLUMN_NAMES,
@@ -67,6 +68,7 @@ export default function JobTable({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [editingJob, setEditingJob] = useState<JobApplication | null>(null);
+  const [highlightsJob, setHighlightsJob] = useState<JobApplication | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
@@ -312,12 +314,36 @@ export default function JobTable({
             {job.company}
           </td>
         );
-      case "role":
+      case "role": {
+        const highlightCount =
+          (job.highlights?.requirements.length || 0) +
+          (job.highlights?.techStack.length || 0) +
+          (job.highlights?.interviewNotes.reduce((acc, r) => acc + r.bullets.length, 0) || 0);
+
         return (
           <td key={colId} className="p-3 text-zinc-300">
-            {job.role}
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-zinc-100">{job.role}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHighlightsJob(job);
+                }}
+                title="Open Key Highlights Vault (Interview Prep)"
+                className="text-[10px] font-medium text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 px-1.5 py-0.5 rounded inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+              >
+                <span>⚡ Prep</span>
+                {highlightCount > 0 && (
+                  <span className="font-mono text-[9px] text-amber-300 font-bold">
+                    {highlightCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </td>
         );
+      }
       case "status":
         return (
           <td key={colId} className="p-3">
@@ -468,10 +494,11 @@ export default function JobTable({
         </div>
 
         {/* Segmented Status Pill Bar with iOS Sliding Frosted Glass Thumb */}
-        <div
-          ref={pillTrackRef}
-          className="relative inline-flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-1 max-w-full overflow-x-visible shadow-inner gap-0.5 shrink-0"
-        >
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+          <div
+            ref={pillTrackRef}
+            className="relative inline-flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-1 max-w-full shadow-inner gap-0.5 shrink-0"
+          >
           {/* iOS-Style Sliding Frosted Glass Thumb */}
           <div
             className="filter-slider-thumb absolute top-1 bottom-1 rounded-md bg-white/15 backdrop-blur-md border border-white/20 shadow-sm transition-all duration-200 ease-out pointer-events-none"
@@ -622,6 +649,7 @@ export default function JobTable({
               )}
             </div>
           )}
+          </div>
         </div>
       </div>
 
@@ -739,7 +767,7 @@ export default function JobTable({
                   {/* Left-edge: Row Number / Hover Slide-Out Pencil */}
                   <td className={`${showRowNumbers ? "w-10 px-2" : "w-8 p-0"} text-center relative select-none`}>
                     {showRowNumbers && (
-                      <span className="font-mono text-[11px] text-[#8b949e] transition-opacity duration-150 group-hover:opacity-0 block">
+                      <span className="font-mono text-[11px] text-[#8b949e] transition-opacity duration-150 sm:group-hover:opacity-0 hidden sm:block">
                         {index + 1}
                       </span>
                     )}
@@ -747,8 +775,8 @@ export default function JobTable({
                       type="button"
                       onClick={() => setEditingJob(job)}
                       title="Edit application"
-                      className={`opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 text-zinc-400 hover:text-[#58a6ff] p-1.5 rounded hover:bg-zinc-800 cursor-pointer inline-flex items-center justify-center ${
-                        showRowNumbers ? "absolute inset-0 m-auto w-6 h-6" : ""
+                      className={`opacity-100 sm:opacity-0 sm:-translate-x-1 sm:group-hover:opacity-100 sm:group-hover:translate-x-0 transition-all duration-200 text-zinc-400 hover:text-[#58a6ff] p-1.5 rounded hover:bg-zinc-800 cursor-pointer inline-flex items-center justify-center ${
+                        showRowNumbers ? "sm:absolute sm:inset-0 sm:m-auto w-6 h-6" : ""
                       }`}
                     >
                       <svg
@@ -781,6 +809,19 @@ export default function JobTable({
         onClose={() => setEditingJob(null)}
         onSave={onSaveEdit}
         onDelete={onDeleteJob}
+        onOpenHighlights={() => {
+          if (editingJob) setHighlightsJob(editingJob);
+        }}
+      />
+
+      <HighlightsVaultDrawer
+        job={highlightsJob ? jobs.find((j) => j.id === highlightsJob.id) || highlightsJob : null}
+        isOpen={!!highlightsJob}
+        onClose={() => setHighlightsJob(null)}
+        onSave={(jobId, highlights) => {
+          onSaveEdit(jobId, { highlights });
+          setHighlightsJob((prev) => (prev && prev.id === jobId ? { ...prev, highlights } : prev));
+        }}
       />
 
       <CSVImportModal

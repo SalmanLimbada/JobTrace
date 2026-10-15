@@ -21,6 +21,9 @@ alter table applications add column if not exists location text default '';
 alter table applications add column if not exists deadline_date text default '';
 alter table applications add column if not exists custom_fields jsonb default '{}'::jsonb;
 
+-- Allow custom statuses configured by users:
+alter table applications drop constraint if exists applications_status_check;
+
 -- Enable Row Level Security (RLS)
 alter table applications enable row level security;
 

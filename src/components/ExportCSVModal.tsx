@@ -119,14 +119,14 @@ export default function ExportCSVModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-2 sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div className="w-full max-w-md rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#30363d]">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 border-b border-[#30363d]">
           <div className="flex items-center gap-2">
             <svg
               className="w-4 h-4 text-[#3fb950]"
@@ -156,7 +156,7 @@ export default function ExportCSVModal({
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+        <div className="px-4 sm:px-5 py-3.5 sm:py-4 space-y-4 max-h-[80vh] sm:max-h-[75vh] overflow-y-auto">
           {/* 1. Format Choice */}
           <div>
             <label className="block text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider mb-2">
@@ -419,8 +419,8 @@ export default function ExportCSVModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-t border-[#30363d] bg-[#0d1117]">
-          <span className="text-xs text-[#8b949e]">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 border-t border-[#30363d] bg-[#0d1117] gap-2.5 sm:gap-0">
+          <span className="text-xs text-[#8b949e] text-center sm:text-left">
             Exporting{" "}
             <strong className="text-[#f0f6fc] font-mono">
               {finalExportJobs.length}
@@ -428,7 +428,7 @@ export default function ExportCSVModal({
             applications
           </span>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}

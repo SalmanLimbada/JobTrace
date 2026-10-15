@@ -10,6 +10,7 @@ interface EditJobModalProps {
   onClose: () => void;
   onSave: (id: string, updated: Partial<JobApplication>) => void;
   onDelete: (id: string) => void;
+  onOpenHighlights?: () => void;
 }
 
 export default function EditJobModal({
@@ -18,6 +19,7 @@ export default function EditJobModal({
   onClose,
   onSave,
   onDelete,
+  onOpenHighlights,
 }: EditJobModalProps) {
   const { customFields, statuses } = useSettings();
   const activeCustomFields = customFields.filter((f) => f.enabled && f.id !== "notes");
@@ -101,14 +103,14 @@ export default function EditJobModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-2 sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div className="w-full max-w-xl rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl flex flex-col overflow-hidden max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#30363d]">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-[#30363d]">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-[#21262d] border border-[#30363d] flex items-center justify-center text-[#58a6ff]">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -124,18 +126,33 @@ export default function EditJobModal({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[#8b949e] hover:text-[#f0f6fc] p-1.5 rounded-md text-xs transition-colors cursor-pointer"
-            aria-label="Close"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenHighlights && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenHighlights();
+                }}
+                className="text-xs font-medium text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Open Interview Prep Highlights Vault"
+              >
+                <span>⚡ Prep Vault</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-[#8b949e] hover:text-[#f0f6fc] p-1.5 rounded-md text-xs transition-colors cursor-pointer"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
           {/* Company & Role */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -264,16 +281,16 @@ export default function EditJobModal({
         </form>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-t border-[#30363d] bg-[#161b22]">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between px-4 sm:px-6 py-3 border-t border-[#30363d] bg-[#161b22] gap-2.5 sm:gap-0 shrink-0">
           <button
             type="button"
             onClick={handleDelete}
-            className="text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
+            className="text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 px-3 py-1.5 rounded-md transition-colors cursor-pointer text-center"
           >
             Delete Application
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}

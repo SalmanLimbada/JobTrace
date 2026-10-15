@@ -49,7 +49,7 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
   return (
     <>
       <header className="border-b border-[#30363d] bg-[#161b22] sticky top-0 z-40">
-        <div className="max-w-5xl mx-auto px-4 sm:px-8 h-14 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-3 sm:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5 select-none">
             <svg
               className="h-6 w-6 shrink-0"
@@ -114,7 +114,7 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Theme Slider Pill */}
             <div className="theme-slider-track relative flex items-center bg-[#0d1117] p-0.5 rounded-full border border-[#30363d] w-[68px] h-[28px] shadow-inner shrink-0">
               <div
@@ -155,7 +155,7 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
               onClick={() => setIsSettingsOpen(true)}
               title="Settings & Preferences"
               aria-label="Settings"
-              className="p-1.5 rounded-md text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] transition-colors cursor-pointer flex items-center justify-center"
+              className="p-1.5 rounded-md text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] transition-colors cursor-pointer flex items-center justify-center shrink-0"
             >
               <svg
                 className="w-4 h-4"
@@ -184,14 +184,14 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
                 <button
                   type="button"
                   onClick={() => setIsProfileOpen((prev) => !prev)}
-                  className="flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-md text-xs font-medium text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] transition-colors cursor-pointer select-none"
+                  className="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 pr-2 sm:pr-2.5 py-1 rounded-md text-xs font-medium text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] transition-colors cursor-pointer select-none"
                   aria-expanded={isProfileOpen}
                   aria-haspopup="true"
                 >
                   <span className="w-5 h-5 rounded-full bg-[#58a6ff]/20 text-[#58a6ff] border border-[#58a6ff]/30 flex items-center justify-center font-bold text-[10px] shrink-0 uppercase">
                     {user.email ? user.email[0] : "U"}
                   </span>
-                  <span className="max-w-[130px] sm:max-w-[180px] truncate text-left">
+                  <span className="hidden sm:inline max-w-[140px] truncate text-left">
                     {user.email}
                   </span>
                   <svg
