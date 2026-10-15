@@ -21,8 +21,6 @@ type SettingsTab = "general" | "statuses" | "columns" | "shortcuts";
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const {
-    theme,
-    setTheme,
     standardColumns,
     toggleStandardColumn,
     showRowNumbers,
@@ -180,48 +178,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           {/* TAB 1: GENERAL */}
           {activeTab === "general" && (
             <div className="space-y-6">
-              {/* Appearance */}
-              <div>
-                <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block mb-2.5">
-                  Appearance Theme
-                </span>
-                <div className="theme-slider-track relative flex items-center bg-[#0d1117] p-1 rounded-full border border-[#30363d] w-24 h-8 shadow-inner">
-                  <div
-                    className={`theme-slider-thumb absolute top-1 bottom-1 left-1 w-[40px] rounded-full bg-white/15 backdrop-blur-md border border-white/20 shadow-sm transition-transform duration-200 ease-out ${
-                      theme === "light" ? "translate-x-[46px]" : "translate-x-0"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setTheme("dark")}
-                    title="Dark mode"
-                    aria-label="Dark mode"
-                    className={`relative z-10 w-1/2 h-full flex items-center justify-center transition-colors cursor-pointer ${
-                      theme === "dark" ? "text-amber-300" : "text-[#8b949e] hover:text-[#c9d1d9]"
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTheme("light")}
-                    title="Light mode"
-                    aria-label="Light mode"
-                    className={`relative z-10 w-1/2 h-full flex items-center justify-center transition-colors cursor-pointer ${
-                      theme === "light" ? "text-amber-500" : "text-[#8b949e] hover:text-[#c9d1d9]"
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <div className="border-t border-[#30363d]/60" />
-
               {/* Table Preferences (Row Numbers) */}
               <div>
                 <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider block mb-2.5">

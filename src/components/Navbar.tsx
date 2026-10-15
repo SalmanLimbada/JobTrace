@@ -8,7 +8,7 @@ import SettingsModal from "@/components/SettingsModal";
 
 export default function Navbar() {
   const { user, signOut, isLoading } = useAuth();
-  const { theme, toggleTheme, isSettingsOpen, setIsSettingsOpen } = useSettings();
+  const { theme, setTheme, isSettingsOpen, setIsSettingsOpen } = useSettings();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
@@ -79,24 +79,41 @@ export default function Navbar() {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              title={theme === "dark" ? "Switch to Light mode" : "Switch to Dark mode"}
-              aria-label="Toggle theme"
-              className="p-1.5 rounded-md text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] transition-colors cursor-pointer flex items-center justify-center text-xs"
-            >
-              {theme === "dark" ? (
-                <svg className="w-4 h-4 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4 text-zinc-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <div className="flex items-center gap-2.5">
+            {/* Theme Slider Pill */}
+            <div className="theme-slider-track relative flex items-center bg-[#0d1117] p-0.5 rounded-full border border-[#30363d] w-[68px] h-[28px] shadow-inner shrink-0">
+              <div
+                className={`theme-slider-thumb absolute top-0.5 bottom-0.5 left-0.5 w-[30px] rounded-full bg-white/15 backdrop-blur-md border border-white/20 shadow-xs transition-transform duration-200 ease-out pointer-events-none ${
+                  theme === "light" ? "translate-x-[34px]" : "translate-x-0"
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                title="Dark mode"
+                aria-label="Dark mode"
+                className={`relative z-10 w-1/2 h-full flex items-center justify-center transition-colors cursor-pointer rounded-full ${
+                  theme === "dark" ? "text-amber-300" : "text-[#8b949e] hover:text-[#c9d1d9]"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                 </svg>
-              )}
-            </button>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme("light")}
+                title="Light mode"
+                aria-label="Light mode"
+                className={`relative z-10 w-1/2 h-full flex items-center justify-center transition-colors cursor-pointer rounded-full ${
+                  theme === "light" ? "text-amber-500" : "text-[#8b949e] hover:text-[#c9d1d9]"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              </button>
+            </div>
 
             <button
               type="button"
