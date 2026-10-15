@@ -101,3 +101,63 @@ html[data-theme="light"] .text-zinc-500 {
 html[data-theme="light"] tr:hover {
   background-color: #f6f8fa !important;
 }
+
+/* --- Filter Toggle Track & Segmented Control Light Mode --- */
+html[data-theme="light"] .filter-toggle-track {
+  background-color: #eaeef2 !important;
+  border-color: #d0d7de !important;
+}
+
+html[data-theme="light"] .filter-slider-thumb {
+  background-color: #ffffff !important;
+  border-color: #d0d7de !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Fix active count badge in filter toggle from being a dark black blob */
+html[data-theme="light"] .bg-\[\#30363d\] {
+  background-color: #d0d7de !important;
+  color: #1f2328 !important;
+}
+
+html[data-theme="light"] .active-filter-badge {
+  background-color: #d0d7de !important;
+  color: #1f2328 !important;
+}
+
+html[data-theme="light"] .inactive-filter-badge {
+  background-color: transparent !important;
+  color: #59636e !important;
+}
+
+/* --- Date Input Calendar Icon: Crisp, High-Contrast & Clearly Visible --- */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.85;
+  filter: brightness(1.2);
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  filter: brightness(1.5);
+}
+
+html[data-theme="light"] input[type="date"] {
+  color-scheme: light;
+}
+
+html[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.85;
+  filter: brightness(0.25) contrast(1.3);
+}
+
+html[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  filter: brightness(0);
+}
+

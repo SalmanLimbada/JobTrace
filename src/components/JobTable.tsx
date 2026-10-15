@@ -497,7 +497,7 @@ export default function JobTable({
         <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
           <div
             ref={pillTrackRef}
-            className="relative inline-flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-1 max-w-full shadow-inner gap-0.5 shrink-0"
+            className="filter-toggle-track relative inline-flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-1 max-w-full shadow-inner gap-0.5 shrink-0"
           >
           {/* iOS-Style Sliding Frosted Glass Thumb */}
           <div
@@ -524,8 +524,8 @@ export default function JobTable({
             <span
               className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] leading-tight transition-colors ${
                 filterStatus === "All"
-                  ? "bg-[#30363d] text-[#f0f6fc] font-semibold"
-                  : "bg-[#161b22] text-[#8b949e]"
+                  ? "bg-[#30363d] text-[#f0f6fc] font-semibold active-filter-badge"
+                  : "bg-[#161b22] text-[#8b949e] inactive-filter-badge"
               }`}
             >
               {statusCounts["All"] || 0}
@@ -553,8 +553,8 @@ export default function JobTable({
                 <span
                   className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] leading-tight transition-colors ${
                     isSelected
-                      ? "bg-[#30363d] text-[#f0f6fc] font-semibold"
-                      : "bg-[#161b22] text-[#8b949e]"
+                      ? "bg-[#30363d] text-[#f0f6fc] font-semibold active-filter-badge"
+                      : "bg-[#161b22] text-[#8b949e] inactive-filter-badge"
                   }`}
                 >
                   {count}
