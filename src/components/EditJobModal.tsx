@@ -10,7 +10,6 @@ interface EditJobModalProps {
   onClose: () => void;
   onSave: (id: string, updated: Partial<JobApplication>) => void;
   onDelete: (id: string) => void;
-  onOpenHighlights?: () => void;
 }
 
 export default function EditJobModal({
@@ -19,7 +18,6 @@ export default function EditJobModal({
   onClose,
   onSave,
   onDelete,
-  onOpenHighlights,
 }: EditJobModalProps) {
   const { customFields, statuses } = useSettings();
   const activeCustomFields = customFields.filter((f) => f.enabled && f.id !== "notes");
@@ -126,29 +124,14 @@ export default function EditJobModal({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {onOpenHighlights && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenHighlights();
-                }}
-                className="text-xs font-medium text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Open Interview Prep Highlights Vault"
-              >
-                <span>⚡ Prep Vault</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-[#8b949e] hover:text-[#f0f6fc] p-1.5 rounded-md text-xs transition-colors cursor-pointer"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[#8b949e] hover:text-[#f0f6fc] p-1.5 rounded-md text-xs transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Form Body */}

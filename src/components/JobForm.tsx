@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { ApplicationStatus, JobHighlights } from "@/types/job";
+import type { ApplicationStatus } from "@/types/job";
 import { useSettings } from "@/context/SettingsContext";
 
 export interface NewJobPayload {
@@ -14,7 +14,7 @@ export interface NewJobPayload {
   location?: string;
   deadlineDate?: string;
   customFields?: Record<string, string>;
-  highlights?: JobHighlights;
+  keyRequirements?: string[];
 }
 
 interface JobFormProps {

@@ -9,16 +9,13 @@ export interface CustomFieldDefinition {
   enabled: boolean;
 }
 
-export interface InterviewRoundNotes {
-  id: string;
-  round: string;
-  bullets: string[];
-}
+export type RequirementsDisplayMode = "drawer" | "column";
 
-export interface JobHighlights {
-  requirements: string[];
-  techStack: string[];
-  interviewNotes: InterviewRoundNotes[];
+export interface ExtensionSettings {
+  autoApprove: boolean;
+  extractRequirements: boolean;
+  requirementsDisplay: RequirementsDisplayMode;
+  targetFields: string[];
 }
 
 export interface JobApplication {
@@ -30,8 +27,8 @@ export interface JobApplication {
   url: string;
   status: ApplicationStatus;
   notes: string;
+  keyRequirements?: string[];
   customFields?: Record<string, string>;
-  highlights?: JobHighlights;
   salary?: string;
   location?: string;
   deadlineDate?: string;

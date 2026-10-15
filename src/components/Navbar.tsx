@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import AuthModal from "@/components/AuthModal";
-import SettingsModal from "@/components/SettingsModal";
 import AccountModal from "@/components/AccountModal";
 import type { JobApplication } from "@/types/job";
 
@@ -15,7 +16,9 @@ interface NavbarProps {
 
 export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
   const { user, signOut, isLoading } = useAuth();
-  const { theme, setTheme, isSettingsOpen, setIsSettingsOpen } = useSettings();
+  const { theme, setTheme } = useSettings();
+  const pathname = usePathname();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -46,80 +49,113 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isProfileOpen]);
 
+  const navLinks = [
+    { href: "/", label: "Tracker" },
+    { href: "/extension", label: "Extension" },
+    { href: "/settings", label: "Settings" },
+  ];
+
   return (
     <>
       <header className="border-b border-[#30363d] bg-[#161b22] sticky top-0 z-40">
-        <div className="max-w-5xl mx-auto px-3 sm:px-8 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 select-none">
-            <svg
-              className="h-6 w-6 shrink-0"
-              viewBox="0 4 64 64"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+        <div className="max-w-5xl mx-auto px-3 sm:px-8 h-14 flex items-center justify-between gap-3">
+          {/* Left: Brand Logo & Title */}
+          <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+            <Link
+              href="/"
+              className="flex items-center gap-2 select-none hover:opacity-90 transition-opacity"
             >
-              <path
-                d="M24 16V10C24 7.8 25.8 6 28 6H36C38.2 6 40 7.8 40 10V16"
-                stroke="#161b22"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <rect
-                x="8"
-                y="16"
-                width="48"
-                height="42"
-                rx="7"
-                fill="#96522c"
-                stroke="#161b22"
-                strokeWidth="3.5"
-              />
-              <path
-                d="M8 23C8 19.1 11.1 16 15 16H49C52.9 16 56 19.1 56 23V36C56 37 55 38 54 38H44L41 42H23L20 38H10C9 38 8 37 8 36V23Z"
-                fill="#b86938"
-                stroke="#161b22"
-                strokeWidth="3.5"
-                strokeLinejoin="round"
-              />
-              <rect
-                x="18"
-                y="14"
-                width="4"
-                height="8"
-                rx="1.5"
-                fill="#e0a030"
-                stroke="#161b22"
-                strokeWidth="2"
-              />
-              <rect
-                x="42"
-                y="14"
-                width="4"
-                height="8"
-                rx="1.5"
-                fill="#e0a030"
-                stroke="#161b22"
-                strokeWidth="2"
-              />
-              <path
-                d="M25 35 H39 C39.8 35 40.5 35.7 40.5 36.5 V38.5 C40.5 39.3 39.8 40 39 40 H34.5 V46.5 C34.5 47.3 33.8 48 33 48 H31 C30.2 48 29.5 47.3 29.5 46.5 V40 H25 C24.2 40 23.5 39.3 23.5 38.5 V36.5 C23.5 35.7 24.2 35 25 35 Z"
-                fill="#e0a030"
-                stroke="#161b22"
-                strokeWidth="2.5"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="font-bold text-base text-[#f0f6fc] tracking-tight leading-none translate-y-px">
-              JobTrace
-            </span>
+              <svg
+                className="h-6 w-6 shrink-0"
+                viewBox="0 4 64 64"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M24 16V10C24 7.8 25.8 6 28 6H36C38.2 6 40 7.8 40 10V16"
+                  stroke="#161b22"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <rect
+                  x="8"
+                  y="16"
+                  width="48"
+                  height="42"
+                  rx="7"
+                  fill="#96522c"
+                  stroke="#161b22"
+                  strokeWidth="3.5"
+                />
+                <path
+                  d="M8 23C8 19.1 11.1 16 15 16H49C52.9 16 56 19.1 56 23V36C56 37 55 38 54 38H44L41 42H23L20 38H10C9 38 8 37 8 36V23Z"
+                  fill="#b86938"
+                  stroke="#161b22"
+                  strokeWidth="3.5"
+                  strokeLinejoin="round"
+                />
+                <rect
+                  x="18"
+                  y="14"
+                  width="4"
+                  height="8"
+                  rx="1.5"
+                  fill="#e0a030"
+                  stroke="#161b22"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="42"
+                  y="14"
+                  width="4"
+                  height="8"
+                  rx="1.5"
+                  fill="#e0a030"
+                  stroke="#161b22"
+                  strokeWidth="2"
+                />
+                <path
+                  d="M25 35 H39 C39.8 35 40.5 35.7 40.5 36.5 V38.5 C40.5 39.3 39.8 40 39 40 H34.5 V46.5 C34.5 47.3 33.8 48 33 48 H31 C30.2 48 29.5 47.3 29.5 46.5 V40 H25 C24.2 40 23.5 39.3 23.5 38.5 V36.5 C23.5 35.7 24.2 35 25 35 Z"
+                  fill="#e0a030"
+                  stroke="#161b22"
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span className="font-bold text-base text-[#f0f6fc] tracking-tight leading-none translate-y-px">
+                JobTrace
+              </span>
+            </Link>
+
+            {/* Navigation Links: Tracker, Extension, Settings */}
+            <nav className="flex items-center gap-1 sm:gap-1.5">
+              {navLinks.map((link) => {
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-[#21262d] text-[#f0f6fc] border border-[#30363d] shadow-2xs font-semibold"
+                        : "text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#21262d]/50"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Right: Theme Switch & Profile */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             {/* Theme Slider Pill */}
-            <div className="theme-slider-track relative flex items-center bg-[#0d1117] p-0.5 rounded-full border border-[#30363d] w-[68px] h-[28px] shadow-inner shrink-0">
+            <div className="theme-slider-track relative flex items-center bg-[#0d1117] p-0.5 rounded-full border border-[#30363d] w-[64px] sm:w-[68px] h-[28px] shadow-inner shrink-0">
               <div
-                className={`theme-slider-thumb absolute top-0.5 bottom-0.5 left-0.5 w-[30px] rounded-full bg-white/15 backdrop-blur-md border border-white/20 shadow-xs transition-transform duration-200 ease-out pointer-events-none ${
-                  theme === "light" ? "translate-x-[34px]" : "translate-x-0"
+                className={`theme-slider-thumb absolute top-0.5 bottom-0.5 left-0.5 w-[28px] sm:w-[30px] rounded-full bg-white/15 backdrop-blur-md border border-white/20 shadow-xs transition-transform duration-200 ease-out pointer-events-none ${
+                  theme === "light" ? "translate-x-[32px] sm:translate-x-[34px]" : "translate-x-0"
                 }`}
               />
               <button
@@ -149,33 +185,6 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
                 </svg>
               </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              title="Settings & Preferences"
-              aria-label="Settings"
-              className="p-1.5 rounded-md text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] transition-colors cursor-pointer flex items-center justify-center shrink-0"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            </button>
 
             {isLoading ? (
               <div className="h-7 w-16 rounded-md bg-[#21262d] animate-pulse" />
@@ -219,6 +228,18 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
                     </div>
 
                     <div className="py-1">
+                      <Link
+                        href="/settings"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors cursor-pointer text-left"
+                      >
+                        <svg className="w-4 h-4 text-[#8b949e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Settings & Preferences
+                      </Link>
+
                       <button
                         type="button"
                         onClick={() => {
@@ -271,7 +292,7 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
             ) : (
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="text-xs font-medium text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] px-3 py-1.5 rounded-md transition-colors"
+                className="text-xs font-medium text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] px-3 py-1.5 rounded-md transition-colors cursor-pointer"
               >
                 Sign In
               </button>
@@ -281,12 +302,6 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
       </header>
 
       <AuthModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        jobs={jobs}
-        onMigrateStatus={onMigrateStatus}
-      />
       <AccountModal
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}

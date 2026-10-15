@@ -76,6 +76,32 @@ export const DEFAULT_FIELDS: CustomFieldDefinition[] = [
 
 export const BASE_COLUMN_ORDER = ["company", "role", "status", "appliedDate", "salary", "location", "deadlineDate", "url"];
 
+export type RequirementsDisplayMode = "drawer" | "column";
+
+export const DEFAULT_EXTENSION_TARGET_FIELDS = [
+  "company",
+  "role",
+  "url",
+  "location",
+  "salary",
+  "notes",
+  "keyRequirements",
+];
+
+export interface ExtensionSettings {
+  autoApprove: boolean;
+  extractRequirements: boolean;
+  requirementsDisplay: RequirementsDisplayMode;
+  targetFields: string[];
+}
+
+export const DEFAULT_EXTENSION_SETTINGS: ExtensionSettings = {
+  autoApprove: false,
+  extractRequirements: true,
+  requirementsDisplay: "drawer",
+  targetFields: DEFAULT_EXTENSION_TARGET_FIELDS,
+};
+
 export interface ColumnSettings {
   salary: boolean;
   location: boolean;
@@ -113,12 +139,15 @@ interface SettingsContextType {
   setIsSettingsOpen: (open: boolean) => void;
   columns: ColumnSettings;
   setColumnVisible: (column: string, visible: boolean) => void;
+  extensionSettings: ExtensionSettings;
+  updateExtensionSettings: (partial: Partial<ExtensionSettings>) => void;
   applySettings: (payload: {
     showRowNumbers: boolean;
     standardColumns: StandardColumnsSettings;
     statuses: string[];
     customFields: CustomFieldDefinition[];
     shortcuts: ShortcutSettings;
+    extensionSettings?: ExtensionSettings;
   }) => void;
 }
 
@@ -131,6 +160,7 @@ const STORAGE_ROW_NUMBERS_KEY = "jobtrace_row_numbers";
 const STORAGE_COLUMN_ORDER_KEY = "jobtrace_column_order";
 const STORAGE_SHORTCUTS_KEY = "jobtrace_shortcuts";
 const STORAGE_STATUSES_KEY = "jobtrace_statuses_v1";
+const STORAGE_EXTENSION_SETTINGS_KEY = "jobtrace_extension_settings";
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<AppTheme>("dark");
@@ -140,10 +170,27 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [columnOrder, setColumnOrderState] = useState<string[]>(BASE_COLUMN_ORDER);
   const [shortcuts, setShortcutsState] = useState<ShortcutSettings>(DEFAULT_SHORTCUTS);
   const [statuses, setStatusesState] = useState<string[]>(DEFAULT_STATUSES);
+  const [extensionSettings, setExtensionSettings] = useState<ExtensionSettings>(DEFAULT_EXTENSION_SETTINGS);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     try {
+      // Extension Settings
+      const savedExt = localStorage.getItem(STORAGE_EXTENSION_SETTINGS_KEY);
+      if (savedExt) {
+        try {
+          const parsed = JSON.parse(savedExt);
+          const merged = { ...DEFAULT_EXTENSION_SETTINGS, ...parsed };
+          if (merged.extractRequirements === false && Array.isArray(merged.targetFields)) {
+            merged.targetFields = merged.targetFields.filter((id: string) => id !== "keyRequirements");
+          } else if (merged.extractRequirements === true && Array.isArray(merged.targetFields)) {
+            if (!merged.targetFields.includes("keyRequirements")) {
+              merged.targetFields = [...merged.targetFields, "keyRequirements"];
+            }
+          }
+          setExtensionSettings(merged);
+        } catch {}
+      }
       // Statuses
       const savedStatuses = localStorage.getItem(STORAGE_STATUSES_KEY);
       if (savedStatuses) {
@@ -465,6 +512,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     statuses: string[];
     customFields: CustomFieldDefinition[];
     shortcuts: ShortcutSettings;
+    extensionSettings?: ExtensionSettings;
   }) => {
     setShowRowNumbersState(payload.showRowNumbers);
     setStandardColumns(payload.standardColumns);
@@ -489,7 +537,36 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_FIELDS_KEY, JSON.stringify(payload.customFields));
       localStorage.setItem(STORAGE_SHORTCUTS_KEY, JSON.stringify(payload.shortcuts));
       localStorage.setItem(STORAGE_COLUMN_ORDER_KEY, JSON.stringify(nextOrder));
+      if (payload.extensionSettings) {
+        setExtensionSettings(payload.extensionSettings);
+        localStorage.setItem(STORAGE_EXTENSION_SETTINGS_KEY, JSON.stringify(payload.extensionSettings));
+      }
     } catch {}
+  };
+
+  const updateExtensionSettings = (partial: Partial<ExtensionSettings>) => {
+    setExtensionSettings((prev) => {
+      const next = { ...prev, ...partial };
+
+      // Keep extractRequirements and targetFields["keyRequirements"] in sync
+      if (partial.extractRequirements !== undefined) {
+        const curTargets = next.targetFields || DEFAULT_EXTENSION_TARGET_FIELDS;
+        if (partial.extractRequirements) {
+          if (!curTargets.includes("keyRequirements")) {
+            next.targetFields = [...curTargets, "keyRequirements"];
+          }
+        } else {
+          next.targetFields = curTargets.filter((id) => id !== "keyRequirements");
+        }
+      } else if (partial.targetFields !== undefined) {
+        next.extractRequirements = partial.targetFields.includes("keyRequirements");
+      }
+
+      try {
+        localStorage.setItem(STORAGE_EXTENSION_SETTINGS_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   return (
@@ -524,6 +601,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setIsSettingsOpen,
         columns,
         setColumnVisible,
+        extensionSettings,
+        updateExtensionSettings,
         applySettings,
       }}
     >

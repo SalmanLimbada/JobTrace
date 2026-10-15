@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import type { ApplicationStatus, JobApplication, JobHighlights } from "@/types/job";
+import { useRouter } from "next/navigation";
+import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { exportApplicationsToCSV } from "@/lib/csv";
 import CSVImportModal from "@/components/CSVImportModal";
 import EditJobModal from "@/components/EditJobModal";
 import ExportCSVModal from "@/components/ExportCSVModal";
-import HighlightsVaultDrawer from "@/components/HighlightsVaultDrawer";
+import SimpleRequirementsDrawer from "@/components/SimpleRequirementsDrawer";
 import {
   useSettings,
   STANDARD_COLUMN_NAMES,
@@ -53,6 +54,7 @@ export default function JobTable({
   onDeleteJob,
   onImportJobs,
 }: JobTableProps) {
+  const router = useRouter();
   const {
     customFields,
     standardColumns,
@@ -61,14 +63,13 @@ export default function JobTable({
     reorderColumns,
     statuses,
     shortcuts,
-    isSettingsOpen,
-    setIsSettingsOpen,
+    extensionSettings,
   } = useSettings();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [editingJob, setEditingJob] = useState<JobApplication | null>(null);
-  const [highlightsJob, setHighlightsJob] = useState<JobApplication | null>(null);
+  const [selectedRequirementsJob, setSelectedRequirementsJob] = useState<JobApplication | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
@@ -100,7 +101,7 @@ export default function JobTable({
       ) {
         return;
       }
-      if (editingJob || isImportModalOpen || isSettingsOpen) {
+      if (editingJob || isImportModalOpen) {
         return;
       }
 
@@ -119,13 +120,13 @@ export default function JobTable({
         }
       } else if (key === shortcuts.openSettings?.toLowerCase()) {
         e.preventDefault();
-        setIsSettingsOpen(true);
+        router.push("/settings");
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [shortcuts, editingJob, isImportModalOpen, isSettingsOpen, setIsSettingsOpen]);
+  }, [shortcuts, editingJob, isImportModalOpen, router]);
 
   // Click outside listener for "More ▾" dropdown
   useEffect(() => {
@@ -172,6 +173,9 @@ export default function JobTable({
       .filter(([k, v]) => v && k !== "notes")
       .map(([k]) => k),
     ...activeCustomFieldIds,
+    ...(extensionSettings?.extractRequirements && extensionSettings?.requirementsDisplay === "column"
+      ? ["keyRequirements"]
+      : []),
   ]);
 
   const orderedVisibleColumns = columnOrder.filter((id) => allActiveIds.has(id));
@@ -199,6 +203,9 @@ export default function JobTable({
   }
 
   function getColumnLabel(colId: string): string {
+    if (colId === "keyRequirements") {
+      return "Key Requirements";
+    }
     if (colId in STANDARD_COLUMN_NAMES) {
       return STANDARD_COLUMN_NAMES[colId as keyof StandardColumnsSettings];
     }
@@ -314,33 +321,45 @@ export default function JobTable({
             {job.company}
           </td>
         );
-      case "role": {
-        const highlightCount =
-          (job.highlights?.requirements.length || 0) +
-          (job.highlights?.techStack.length || 0) +
-          (job.highlights?.interviewNotes.reduce((acc, r) => acc + r.bullets.length, 0) || 0);
-
+      case "role":
         return (
           <td key={colId} className="p-3 text-zinc-300">
             <div className="flex items-center gap-2">
               <span className="font-medium text-zinc-100">{job.role}</span>
+              {extensionSettings?.extractRequirements &&
+                extensionSettings?.requirementsDisplay === "drawer" &&
+                job.keyRequirements &&
+                job.keyRequirements.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedRequirementsJob(job);
+                    }}
+                    title="View Key Requirements"
+                    className="text-[10px] font-mono text-[#58a6ff] bg-[#58a6ff]/10 hover:bg-[#58a6ff]/20 border border-[#58a6ff]/30 px-1.5 py-0.5 rounded transition-colors cursor-pointer shrink-0"
+                  >
+                    {job.keyRequirements.length} reqs
+                  </button>
+                )}
+            </div>
+          </td>
+        );
+      case "keyRequirements": {
+        const reqs = job.keyRequirements || [];
+        return (
+          <td key={colId} className="p-3">
+            {reqs.length === 0 ? (
+              <span className="text-zinc-600 text-xs font-mono">—</span>
+            ) : (
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setHighlightsJob(job);
-                }}
-                title="Open Key Highlights Vault (Interview Prep)"
-                className="text-[10px] font-medium text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 px-1.5 py-0.5 rounded inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                onClick={() => setSelectedRequirementsJob(job)}
+                className="text-xs text-[#58a6ff] hover:underline cursor-pointer font-medium"
               >
-                <span>⚡ Prep</span>
-                {highlightCount > 0 && (
-                  <span className="font-mono text-[9px] text-amber-300 font-bold">
-                    {highlightCount}
-                  </span>
-                )}
+                {reqs.length} {reqs.length === 1 ? "requirement" : "requirements"}
               </button>
-            </div>
+            )}
           </td>
         );
       }
@@ -809,19 +828,12 @@ export default function JobTable({
         onClose={() => setEditingJob(null)}
         onSave={onSaveEdit}
         onDelete={onDeleteJob}
-        onOpenHighlights={() => {
-          if (editingJob) setHighlightsJob(editingJob);
-        }}
       />
 
-      <HighlightsVaultDrawer
-        job={highlightsJob ? jobs.find((j) => j.id === highlightsJob.id) || highlightsJob : null}
-        isOpen={!!highlightsJob}
-        onClose={() => setHighlightsJob(null)}
-        onSave={(jobId, highlights) => {
-          onSaveEdit(jobId, { highlights });
-          setHighlightsJob((prev) => (prev && prev.id === jobId ? { ...prev, highlights } : prev));
-        }}
+      <SimpleRequirementsDrawer
+        job={selectedRequirementsJob}
+        isOpen={!!selectedRequirementsJob}
+        onClose={() => setSelectedRequirementsJob(null)}
       />
 
       <CSVImportModal

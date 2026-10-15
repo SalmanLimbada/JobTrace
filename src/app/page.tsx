@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import type { ApplicationStatus, JobApplication, JobHighlights } from "@/types/job";
+import type { ApplicationStatus, JobApplication } from "@/types/job";
 import StatsBanner from "@/components/StatsBanner";
 import JobForm, { type NewJobPayload } from "@/components/JobForm";
 import JobTable from "@/components/JobTable";
@@ -56,8 +56,8 @@ export default function Home() {
         if (guestList.length > 0) {
           const rowsToMigrate = guestList.map((job) => {
             const mergedCustom: Record<string, unknown> = { ...(job.customFields || {}) };
-            if (job.highlights) {
-              mergedCustom._highlights = JSON.stringify(job.highlights);
+            if (job.keyRequirements) {
+              mergedCustom._keyRequirements = JSON.stringify(job.keyRequirements);
             }
             return {
               id: job.id,
@@ -102,14 +102,26 @@ export default function Home() {
       if (data) {
         const map: Record<string, JobApplication> = {};
         for (const row of data) {
-          let parsedHighlights: JobHighlights | undefined = undefined;
+          let parsedRequirements: string[] | undefined = undefined;
           let cleanedCustomFields: Record<string, string> | undefined = undefined;
 
           if (row.custom_fields && typeof row.custom_fields === "object") {
             const cf = { ...row.custom_fields };
-            if (cf._highlights) {
+            if (cf._keyRequirements) {
               try {
-                parsedHighlights = JSON.parse(cf._highlights);
+                parsedRequirements = JSON.parse(cf._keyRequirements);
+              } catch {
+                // ignore
+              }
+              delete cf._keyRequirements;
+            }
+            if (cf._highlights) {
+              // Backward-compatibility: if user had requirements under old key
+              try {
+                const old = JSON.parse(cf._highlights);
+                if (Array.isArray(old?.requirements)) {
+                  parsedRequirements = old.requirements;
+                }
               } catch {
                 // ignore
               }
@@ -133,7 +145,7 @@ export default function Home() {
             location: row.location || undefined,
             deadlineDate: row.deadline_date || undefined,
             customFields: cleanedCustomFields,
-            highlights: parsedHighlights,
+            keyRequirements: parsedRequirements,
           };
         }
         setJobs(map);
@@ -175,7 +187,7 @@ export default function Home() {
       location: payload.location,
       deadlineDate: payload.deadlineDate,
       customFields: payload.customFields,
-      highlights: payload.highlights,
+      keyRequirements: payload.keyRequirements,
     };
 
     // Update state immediately
@@ -204,10 +216,10 @@ export default function Home() {
       if (payload.location) dbRow.location = payload.location;
       if (payload.deadlineDate) dbRow.deadline_date = payload.deadlineDate;
 
-      if (payload.customFields || payload.highlights) {
+      if (payload.customFields || payload.keyRequirements) {
         const mergedCustom: Record<string, unknown> = { ...(payload.customFields || {}) };
-        if (payload.highlights) {
-          mergedCustom._highlights = JSON.stringify(payload.highlights);
+        if (payload.keyRequirements) {
+          mergedCustom._keyRequirements = JSON.stringify(payload.keyRequirements);
         }
         dbRow.custom_fields = mergedCustom;
       }
@@ -282,15 +294,15 @@ export default function Home() {
       if (updated.location !== undefined) dbPayload.location = updated.location;
       if (updated.deadlineDate !== undefined) dbPayload.deadline_date = updated.deadlineDate;
 
-      if (updated.customFields !== undefined || updated.highlights !== undefined) {
+      if (updated.customFields !== undefined || updated.keyRequirements !== undefined) {
         const mergedCustom: Record<string, unknown> = {
           ...(jobs[id]?.customFields || {}),
           ...(updated.customFields || {}),
         };
-        const highlightsToSave =
-          updated.highlights !== undefined ? updated.highlights : jobs[id]?.highlights;
-        if (highlightsToSave) {
-          mergedCustom._highlights = JSON.stringify(highlightsToSave);
+        const requirementsToSave =
+          updated.keyRequirements !== undefined ? updated.keyRequirements : jobs[id]?.keyRequirements;
+        if (requirementsToSave) {
+          mergedCustom._keyRequirements = JSON.stringify(requirementsToSave);
         }
         dbPayload.custom_fields = mergedCustom;
       }
