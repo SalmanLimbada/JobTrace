@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent, useMemo } from "react";
 import {
   useSettings,
   SUGGESTED_FIELDS,
   SUGGESTED_STATUSES,
   STANDARD_COLUMN_NAMES,
   SHORTCUT_LABELS,
+  DEFAULT_STATUSES,
+  DEFAULT_SHORTCUTS,
   type StandardColumnsSettings,
   type ShortcutSettings,
 } from "@/context/SettingsContext";
-import type { CustomFieldType } from "@/types/job";
+import type { CustomFieldDefinition, CustomFieldType } from "@/types/job";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -22,24 +24,22 @@ type SettingsTab = "general" | "statuses" | "columns" | "shortcuts";
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const {
     standardColumns,
-    toggleStandardColumn,
     showRowNumbers,
-    toggleShowRowNumbers,
     customFields,
-    addCustomField,
-    removeCustomField,
-    toggleCustomField,
     statuses,
-    addStatus,
-    removeStatus,
-    reorderStatuses,
-    resetStatuses,
     shortcuts,
-    updateShortcut,
-    resetShortcuts,
+    applySettings,
   } = useSettings();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+
+  // Local draft states (staged until Save & Apply Changes is clicked)
+  const [draftShowRowNumbers, setDraftShowRowNumbers] = useState(showRowNumbers);
+  const [draftStandardColumns, setDraftStandardColumns] = useState<StandardColumnsSettings>(standardColumns);
+  const [draftStatuses, setDraftStatuses] = useState<string[]>(statuses);
+  const [draftCustomFields, setDraftCustomFields] = useState<CustomFieldDefinition[]>(customFields);
+  const [draftShortcuts, setDraftShortcuts] = useState<ShortcutSettings>(shortcuts);
+
   const [newFieldName, setNewFieldName] = useState("");
   const [newFieldType, setNewFieldType] = useState<CustomFieldType>("text");
   const [newStatusName, setNewStatusName] = useState("");
@@ -50,6 +50,20 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [dragOverSide, setDragOverSide] = useState<"above" | "below">("above");
 
+  // Re-sync draft state from context when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setDraftShowRowNumbers(showRowNumbers);
+      setDraftStandardColumns(standardColumns);
+      setDraftStatuses(statuses);
+      setDraftCustomFields(customFields);
+      setDraftShortcuts(shortcuts);
+      setNewFieldName("");
+      setNewStatusName("");
+      setRecordingShortcut(null);
+    }
+  }, [isOpen, showRowNumbers, standardColumns, statuses, customFields, shortcuts]);
+
   useEffect(() => {
     if (!isOpen) return;
     function handleKeyDown(e: KeyboardEvent) {
@@ -59,21 +73,130 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Dirty state calculation
+  const isDirty = useMemo(() => {
+    return (
+      draftShowRowNumbers !== showRowNumbers ||
+      JSON.stringify(draftStandardColumns) !== JSON.stringify(standardColumns) ||
+      JSON.stringify(draftStatuses) !== JSON.stringify(statuses) ||
+      JSON.stringify(draftCustomFields) !== JSON.stringify(customFields) ||
+      JSON.stringify(draftShortcuts) !== JSON.stringify(shortcuts)
+    );
+  }, [
+    draftShowRowNumbers,
+    showRowNumbers,
+    draftStandardColumns,
+    standardColumns,
+    draftStatuses,
+    statuses,
+    draftCustomFields,
+    customFields,
+    draftShortcuts,
+    shortcuts,
+  ]);
+
   if (!isOpen) return null;
+
+  function handleSave() {
+    applySettings({
+      showRowNumbers: draftShowRowNumbers,
+      standardColumns: draftStandardColumns,
+      statuses: draftStatuses,
+      customFields: draftCustomFields,
+      shortcuts: draftShortcuts,
+    });
+    onClose();
+  }
+
+  // --- Draft Column Handlers ---
+  function handleToggleStandardColumn(colKey: keyof StandardColumnsSettings) {
+    setDraftStandardColumns((prev) => ({
+      ...prev,
+      [colKey]: !prev[colKey],
+    }));
+  }
+
+  function handleAddCustomField(name: string, type: CustomFieldType = "text") {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const cleanId = trimmed.toLowerCase().replace(/[^a-z0-9]/g, "_") || `field_${Date.now()}`;
+    const exists = draftCustomFields.some(
+      (f) => f.id === cleanId || f.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) {
+      setDraftCustomFields((prev) =>
+        prev.map((f) =>
+          f.id === cleanId || f.name.toLowerCase() === trimmed.toLowerCase()
+            ? { ...f, enabled: true }
+            : f
+        )
+      );
+    } else {
+      setDraftCustomFields((prev) => [
+        ...prev,
+        { id: cleanId, name: trimmed, type, enabled: true },
+      ]);
+    }
+  }
 
   function handleCreateField(e: FormEvent) {
     e.preventDefault();
     if (!newFieldName.trim()) return;
-    addCustomField(newFieldName.trim(), newFieldType);
+    handleAddCustomField(newFieldName.trim(), newFieldType);
     setNewFieldName("");
     setNewFieldType("text");
   }
 
+  function handleToggleCustomField(id: string) {
+    setDraftCustomFields((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, enabled: !f.enabled } : f))
+    );
+  }
+
+  function handleRemoveCustomField(id: string) {
+    setDraftCustomFields((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  // --- Draft Status Handlers ---
   function handleAddStatus(e: FormEvent) {
     e.preventDefault();
-    if (!newStatusName.trim()) return;
-    addStatus(newStatusName.trim());
+    const trimmed = newStatusName.trim();
+    if (!trimmed) return;
+    if (!draftStatuses.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+      setDraftStatuses((prev) => [...prev, trimmed]);
+    }
     setNewStatusName("");
+  }
+
+  function handleRemoveStatus(name: string) {
+    if (draftStatuses.length <= 1) return;
+    setDraftStatuses((prev) => prev.filter((s) => s !== name));
+  }
+
+  function handleResetStatuses() {
+    setDraftStatuses(DEFAULT_STATUSES);
+  }
+
+  function handleReorderStatuses(sourceName: string, targetName: string, side: "above" | "below" = "above") {
+    if (sourceName === targetName) return;
+    const sourceIdx = draftStatuses.indexOf(sourceName);
+    if (sourceIdx === -1) return;
+    const next = [...draftStatuses];
+    const [moved] = next.splice(sourceIdx, 1);
+    const targetIdx = next.indexOf(targetName);
+    if (targetIdx === -1) return;
+    const insertIdx = side === "above" ? targetIdx : targetIdx + 1;
+    next.splice(insertIdx, 0, moved);
+    setDraftStatuses(next);
+  }
+
+  // --- Draft Shortcut Handlers ---
+  function handleUpdateShortcut(action: keyof ShortcutSettings, key: string) {
+    setDraftShortcuts((prev) => ({ ...prev, [action]: key.toLowerCase() }));
+  }
+
+  function handleResetShortcuts() {
+    setDraftShortcuts(DEFAULT_SHORTCUTS);
   }
 
   const standardColumnKeys: (keyof StandardColumnsSettings)[] = [
@@ -143,7 +266,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           >
             <span>Statuses</span>
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[#21262d] text-[#8b949e]">
-              {statuses.length}
+              {draftStatuses.length}
             </span>
           </button>
           <button
@@ -157,7 +280,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           >
             <span>Columns</span>
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[#21262d] text-[#8b949e]">
-              {customFields.filter((f) => f.enabled).length}
+              {draftCustomFields.filter((f) => f.enabled).length}
             </span>
           </button>
           <button
@@ -191,16 +314,16 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </div>
                   <button
                     type="button"
-                    onClick={toggleShowRowNumbers}
+                    onClick={() => setDraftShowRowNumbers((prev) => !prev)}
                     role="switch"
-                    aria-checked={showRowNumbers}
+                    aria-checked={draftShowRowNumbers}
                     className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer shrink-0 ${
-                      showRowNumbers ? "bg-[#238636]" : "bg-[#30363d]"
+                      draftShowRowNumbers ? "bg-[#238636]" : "bg-[#30363d]"
                     }`}
                   >
                     <span
                       className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-                        showRowNumbers ? "translate-x-4" : "translate-x-0.5"
+                        draftShowRowNumbers ? "translate-x-4" : "translate-x-0.5"
                       }`}
                     />
                   </button>
@@ -218,7 +341,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </span>
                 <button
                   type="button"
-                  onClick={resetStatuses}
+                  onClick={handleResetStatuses}
                   className="text-[11px] text-[#8b949e] hover:text-[#58a6ff] transition-colors cursor-pointer"
                 >
                   Reset Defaults
@@ -232,7 +355,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {SUGGESTED_STATUSES.map((s) => {
-                    const alreadyExists = statuses.some(
+                    const alreadyExists = draftStatuses.some(
                       (status) => status.toLowerCase() === s.toLowerCase()
                     );
                     return (
@@ -240,7 +363,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         key={s}
                         type="button"
                         disabled={alreadyExists}
-                        onClick={() => addStatus(s)}
+                        onClick={() => {
+                          if (!alreadyExists) {
+                            setDraftStatuses((prev) => [...prev, s]);
+                          }
+                        }}
                         className={`text-[11px] px-2.5 py-1 rounded-md border transition-colors ${
                           alreadyExists
                             ? "border-[#30363d] bg-[#21262d]/40 text-[#8b949e] opacity-60 cursor-default"
@@ -281,7 +408,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
               {/* Status List with 6-dot Drag Handle */}
               <div className="space-y-1.5">
-                {statuses.map((status, index) => {
+                {draftStatuses.map((status, index) => {
                   const isTopFour = index < 4;
                   const isDragged = draggedStatus === status;
                   const isDragOver = dragOverStatus === status && !isDragged;
@@ -315,7 +442,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         e.preventDefault();
                         const source = draggedStatus || e.dataTransfer.getData("text/plain");
                         if (source && source !== status) {
-                          reorderStatuses(source, status, dragOverSide);
+                          handleReorderStatuses(source, status, dragOverSide);
                         }
                         setDraggedStatus(null);
                         setDragOverStatus(null);
@@ -369,8 +496,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
                       <button
                         type="button"
-                        disabled={statuses.length <= 1}
-                        onClick={() => removeStatus(status)}
+                        disabled={draftStatuses.length <= 1}
+                        onClick={() => handleRemoveStatus(status)}
                         className="p-1 text-[#8b949e] hover:text-[#f85149] disabled:opacity-20 disabled:hover:text-[#8b949e] rounded hover:bg-[#21262d] cursor-pointer disabled:cursor-default transition-colors text-xs"
                         title={`Delete status "${status}"`}
                       >
@@ -394,12 +521,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {standardColumnKeys.map((colKey) => {
-                    const isEnabled = standardColumns[colKey];
+                    const isEnabled = draftStandardColumns[colKey];
                     return (
                       <button
                         key={colKey}
                         type="button"
-                        onClick={() => toggleStandardColumn(colKey)}
+                        onClick={() => handleToggleStandardColumn(colKey)}
                         className={`p-2.5 rounded-lg border text-left transition-colors flex items-center justify-between cursor-pointer ${
                           isEnabled
                             ? "border-[#58a6ff]/60 bg-[#58a6ff]/10 text-[#f0f6fc]"
@@ -437,7 +564,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {SUGGESTED_FIELDS.map((s) => {
-                      const alreadyExists = customFields.some(
+                      const alreadyExists = draftCustomFields.some(
                         (f) => f.id === s.id || f.name.toLowerCase() === s.name.toLowerCase()
                       );
                       return (
@@ -445,7 +572,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           key={s.id}
                           type="button"
                           disabled={alreadyExists}
-                          onClick={() => addCustomField(s.name, s.type)}
+                          onClick={() => handleAddCustomField(s.name, s.type)}
                           className={`text-[11px] px-2.5 py-1 rounded-md border transition-colors ${
                             alreadyExists
                               ? "border-[#30363d] bg-[#21262d]/40 text-[#8b949e] opacity-60 cursor-default"
@@ -494,13 +621,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </form>
 
                 {/* Active Custom Fields List */}
-                {customFields.length > 0 ? (
+                {draftCustomFields.length > 0 ? (
                   <div className="space-y-1.5">
                     <span className="text-[11px] font-medium text-[#8b949e] block">
-                      Active Custom Fields ({customFields.length}):
+                      Active Custom Fields ({draftCustomFields.length}):
                     </span>
                     <div className="space-y-1.5">
-                      {customFields.map((field) => (
+                      {draftCustomFields.map((field) => (
                         <div
                           key={field.id}
                           className="flex items-center justify-between p-2.5 rounded-lg border border-[#30363d] bg-[#0d1117]"
@@ -517,7 +644,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           <div className="flex items-center gap-3">
                             <button
                               type="button"
-                              onClick={() => toggleCustomField(field.id)}
+                              onClick={() => handleToggleCustomField(field.id)}
                               role="switch"
                               aria-checked={field.enabled}
                               className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer shrink-0 ${
@@ -533,7 +660,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
                             <button
                               type="button"
-                              onClick={() => removeCustomField(field.id)}
+                              onClick={() => handleRemoveCustomField(field.id)}
                               title={`Delete field "${field.name}"`}
                               className="text-[#8b949e] hover:text-[#f85149] p-1 rounded transition-colors cursor-pointer"
                             >
@@ -562,7 +689,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </span>
                 <button
                   type="button"
-                  onClick={resetShortcuts}
+                  onClick={handleResetShortcuts}
                   className="text-[11px] text-[#8b949e] hover:text-[#58a6ff] transition-colors cursor-pointer"
                 >
                   Reset Defaults
@@ -570,9 +697,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </div>
 
               <div className="space-y-1.5">
-                {(Object.keys(shortcuts) as (keyof ShortcutSettings)[]).map((action) => {
+                {(Object.keys(draftShortcuts) as (keyof ShortcutSettings)[]).map((action) => {
                   const isRecording = recordingShortcut === action;
-                  const keyVal = shortcuts[action];
+                  const keyVal = draftShortcuts[action];
                   const info = SHORTCUT_LABELS[action];
 
                   return (
@@ -601,7 +728,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             return;
                           }
                           const pressed = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-                          updateShortcut(action, pressed);
+                          handleUpdateShortcut(action, pressed);
                           setRecordingShortcut(null);
                         }}
                         className={`min-w-[42px] px-2.5 py-1 text-center font-mono text-xs rounded border transition-all cursor-pointer ${
@@ -621,14 +748,41 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-6 py-3.5 border-t border-[#30363d] bg-[#161b22]">
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-xs font-medium text-white bg-[#238636] hover:bg-[#2ea043] px-4 py-2 rounded-md transition-colors cursor-pointer shadow-xs"
-          >
-            Done
-          </button>
+        <div className="flex items-center justify-between px-6 py-3.5 border-t border-[#30363d] bg-[#161b22]">
+          <div>
+            {isDirty ? (
+              <span className="text-xs text-amber-400 flex items-center gap-1.5 font-medium">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                Unsaved changes
+              </span>
+            ) : (
+              <span className="text-xs text-[#8b949e]">
+                All settings up to date
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] px-3.5 py-2 rounded-md transition-colors cursor-pointer font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!isDirty}
+              className={`text-xs font-semibold px-4 py-2 rounded-md transition-all shadow-xs flex items-center gap-1.5 ${
+                isDirty
+                  ? "bg-[#238636] hover:bg-[#2ea043] text-white cursor-pointer"
+                  : "bg-[#21262d] text-[#8b949e] opacity-60 cursor-not-allowed"
+              }`}
+            >
+              Save & Apply Changes
+            </button>
+          </div>
         </div>
       </div>
     </div>

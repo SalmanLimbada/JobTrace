@@ -113,6 +113,13 @@ interface SettingsContextType {
   setIsSettingsOpen: (open: boolean) => void;
   columns: ColumnSettings;
   setColumnVisible: (column: string, visible: boolean) => void;
+  applySettings: (payload: {
+    showRowNumbers: boolean;
+    standardColumns: StandardColumnsSettings;
+    statuses: string[];
+    customFields: CustomFieldDefinition[];
+    shortcuts: ShortcutSettings;
+  }) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -452,6 +459,39 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const applySettings = (payload: {
+    showRowNumbers: boolean;
+    standardColumns: StandardColumnsSettings;
+    statuses: string[];
+    customFields: CustomFieldDefinition[];
+    shortcuts: ShortcutSettings;
+  }) => {
+    setShowRowNumbersState(payload.showRowNumbers);
+    setStandardColumns(payload.standardColumns);
+    setStatusesState(payload.statuses);
+    setCustomFields(payload.customFields);
+    setShortcutsState(payload.shortcuts);
+
+    const nextOrder = [...columnOrder].filter(
+      (c) =>
+        BASE_COLUMN_ORDER.includes(c) ||
+        payload.customFields.some((f) => f.id === c)
+    );
+    payload.customFields.forEach((f) => {
+      if (!nextOrder.includes(f.id)) nextOrder.push(f.id);
+    });
+    setColumnOrderState(nextOrder);
+
+    try {
+      localStorage.setItem(STORAGE_ROW_NUMBERS_KEY, String(payload.showRowNumbers));
+      localStorage.setItem(STORAGE_STANDARD_COLS_KEY, JSON.stringify(payload.standardColumns));
+      localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(payload.statuses));
+      localStorage.setItem(STORAGE_FIELDS_KEY, JSON.stringify(payload.customFields));
+      localStorage.setItem(STORAGE_SHORTCUTS_KEY, JSON.stringify(payload.shortcuts));
+      localStorage.setItem(STORAGE_COLUMN_ORDER_KEY, JSON.stringify(nextOrder));
+    } catch {}
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -484,6 +524,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setIsSettingsOpen,
         columns,
         setColumnVisible,
+        applySettings,
       }}
     >
       {children}
