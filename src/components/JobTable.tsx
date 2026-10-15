@@ -78,6 +78,8 @@ export default function JobTable({
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
   const pillTrackRef = useRef<HTMLDivElement>(null);
   const [thumbStyle, setThumbStyle] = useState({ left: 4, width: 0, opacity: 0 });
 
@@ -139,6 +141,25 @@ export default function JobTable({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isMoreOpen]);
+
+  // Click outside listener for action menu (Import/Export CSV)
+  useEffect(() => {
+    if (!isActionsOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
+        setIsActionsOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setIsActionsOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isActionsOpen]);
 
   // Compute active ordered columns
   const activeCustomFieldIds = customFields.filter((f) => f.enabled).map((f) => f.id);
@@ -362,7 +383,7 @@ export default function JobTable({
     <div>
       {/* Search & Status Filter Toolbar */}
       <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between mb-4">
-        <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center flex-1 max-w-md">
+        <div className="flex items-center gap-2 flex-1 max-w-md">
           <div className="relative flex-1">
             <input
               ref={searchInputRef}
@@ -382,22 +403,66 @@ export default function JobTable({
               </button>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => exportApplicationsToCSV(jobs, customFields)}
-            className="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 px-3 py-2 rounded transition-colors cursor-pointer whitespace-nowrap"
-            title="Download applications as CSV"
-          >
-            Export CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsImportModalOpen(true)}
-            className="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 px-3 py-2 rounded transition-colors cursor-pointer whitespace-nowrap"
-            title="Upload applications from CSV"
-          >
-            Import CSV
-          </button>
+
+          {/* Action Menu (Import / Export CSV) */}
+          <div className="relative" ref={actionsRef}>
+            <button
+              type="button"
+              onClick={() => setIsActionsOpen((prev) => !prev)}
+              title="Import or export applications"
+              aria-label="Import or export data"
+              aria-expanded={isActionsOpen}
+              className={`h-[38px] w-[38px] rounded border border-zinc-700 transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
+                isActionsOpen
+                  ? "bg-zinc-800 text-white border-zinc-500"
+                  : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <circle cx="5" cy="12" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="19" cy="12" r="2" />
+              </svg>
+            </button>
+
+            {isActionsOpen && (
+              <div className="absolute right-0 mt-1.5 w-56 rounded-lg border border-[#30363d] bg-[#161b22] shadow-xl z-30 p-1 animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsActionsOpen(false);
+                    setIsImportModalOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] rounded-md transition-colors text-left cursor-pointer"
+                >
+                  <svg className="w-4 h-4 text-[#58a6ff] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  <div>
+                    <span className="font-medium block">Import CSV</span>
+                    <span className="text-[10px] text-[#8b949e] block">Upload applications from file</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsActionsOpen(false);
+                    exportApplicationsToCSV(jobs, customFields);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] rounded-md transition-colors text-left cursor-pointer"
+                >
+                  <svg className="w-4 h-4 text-[#3fb950] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <div>
+                    <span className="font-medium block">Export CSV</span>
+                    <span className="text-[10px] text-[#8b949e] block">Download all applications</span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Segmented Status Pill Bar with iOS Sliding Frosted Glass Thumb */}
