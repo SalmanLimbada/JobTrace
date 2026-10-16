@@ -10,21 +10,59 @@ let currentUserId = null;
 // Extractor function executed in context of the active tab
 function scrapePageDetails() {
   try {
-    const JUNK_COMPANY_REGEX = /^(careers?|jobs?|apply|job search|search|welcome|candidate home|portal|dashboard|search jobs|current openings|join us|work with us|job opportunities|opportunities|workday|logo|company logo|myworkdayjobs|home|back|sign in|login|thank you|confirmation)$/i;
-    const JUNK_ROLE_REGEX = /^(thank you|thanks|application (?:submitted|received|status|confirmation)|applied|congratulations|success|candidate (?:home|portal|profile)|careers?|home|sign in|login|welcome|dashboard|confirm(?:ation)?)$/i;
+    function decodeHTMLEntities(str) {
+      if (!str || typeof str !== "string") return "";
+      return str
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&ndash;/gi, "–")
+        .replace(/&mdash;/gi, "—")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&bull;/gi, "•")
+        .replace(/&#8211;/g, "–")
+        .replace(/&#8212;/g, "—")
+        .replace(/&#8226;/g, "•")
+        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
+        .replace(/\u00A0/g, " ")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function cleanRoleTitle(title) {
+      if (!title || typeof title !== "string") return "";
+      let t = decodeHTMLEntities(title);
+      t = t.replace(/^[\s•–—\-:|]+|[\s•–—\-:|]+$/g, "").trim();
+      return t;
+    }
+
+    const JUNK_COMPANY_EXACT = /^(careers?|jobs?|apply|apply now|job search|search|search for jobs|browse jobs|find jobs|view jobs|all jobs|current openings|open positions|welcome|candidate home|candidate portal|portal|dashboard|join us|work with us|job opportunities|opportunities|workday|logo|company logo|myworkdayjobs|home|back|back to search|back to jobs|sign in|log in|login|thank you|confirmation|menu|navigation|main navigation|header|footer|banner|button|submit|overview|introduce yourself|saved jobs|job alerts)$/i;
+
+    const JUNK_COMPANY_PHRASE = /\b(search(?:\s+for)?\s+jobs?|job\s+search|find\s+(?:a\s+)?jobs?|browse\s+(?:all\s+)?jobs?|current\s+openings|career\s+opportunities|candidate\s+home|candidate\s+portal|sign\s+in|log\s+in|introduce\s+yourself|navigation\s+menu|back\s+to\s+search|view\s+all\s+jobs|explore\s+careers|join\s+our\s+talent|talent\s+community)\b/i;
 
     function isValidCompany(name) {
       if (!name || typeof name !== "string") return false;
-      const t = name.trim();
+      const t = decodeHTMLEntities(name).trim();
       if (t.length < 2 || t.length > 70) return false;
-      return !JUNK_COMPANY_REGEX.test(t);
+      if (JUNK_COMPANY_EXACT.test(t)) return false;
+      if (JUNK_COMPANY_PHRASE.test(t)) return false;
+      if (/^(search|browse|find|apply|sign\s+in|log\s+in|back\s+to)\b/i.test(t)) return false;
+      return true;
     }
+
+    const JUNK_ROLE_REGEX = /^(thank you|thanks|application (?:submitted|received|status|confirmation)|applied|congratulations|success|candidate (?:home|portal|profile)|careers?|home|sign in|login|welcome|dashboard|confirm(?:ation)?|search(?:\s+for)?\s+jobs?|browse\s+jobs?)$/i;
 
     function isValidRole(title) {
       if (!title || typeof title !== "string") return false;
-      const t = title.trim();
-      if (t.length < 2 || t.length > 100) return false;
-      return !JUNK_ROLE_REGEX.test(t);
+      const t = cleanRoleTitle(title);
+      if (t.length < 2 || t.length > 120) return false;
+      if (JUNK_ROLE_REGEX.test(t)) return false;
+      if (/^(search(?:\s+for)?\s+jobs?|sign\s+in|log\s+in|candidate\s+home)$/i.test(t)) return false;
+      return true;
     }
 
     let initialUrl = window.location.href;
@@ -52,271 +90,361 @@ function scrapePageDetails() {
     };
 
     // 1. Schema.org JSON-LD
-  try {
-    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
-    for (const s of scripts) {
-      try {
-        let json = JSON.parse(s.textContent || "{}");
-        if (Array.isArray(json)) json = json.find(j => j && j["@type"] === "JobPosting") || json[0];
-        if (json && json["@graph"]) json = json["@graph"].find(j => j && j["@type"] === "JobPosting") || json;
+    try {
+      const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (const s of scripts) {
+        try {
+          let json = JSON.parse(s.textContent || "{}");
+          if (Array.isArray(json)) json = json.find(j => j && j["@type"] === "JobPosting") || json[0];
+          if (json && json["@graph"]) json = json["@graph"].find(j => j && j["@type"] === "JobPosting") || json;
 
-        if (json && (json["@type"] === "JobPosting" || json.title || json.hiringOrganization)) {
-          if (json.title && !result.role) result.role = json.title;
-          if (json.identifier) {
-            const idVal = typeof json.identifier === "string" ? json.identifier : (json.identifier.value || json.identifier.name);
-            if (idVal && !result.jobId) result.jobId = String(idVal).trim();
-          }
-          if (!result.jobId && json.jobPostingId) result.jobId = String(json.jobPostingId).trim();
-          if (json.hiringOrganization) {
-            const org = typeof json.hiringOrganization === "string" ? json.hiringOrganization : json.hiringOrganization.name;
-            if (org && isValidCompany(org) && !result.company) result.company = org.trim();
-          }
-          if (json.jobLocation) {
-            let loc = "";
-            const addr = json.jobLocation.address;
-            if (typeof addr === "string") loc = addr;
-            else if (addr && typeof addr === "object") {
-              loc = [addr.addressLocality, addr.addressRegion, addr.addressCountry].filter(Boolean).join(", ");
+          if (json && (json["@type"] === "JobPosting" || json.title || json.hiringOrganization)) {
+            if (json.title && !result.role) {
+              const cleanTitle = cleanRoleTitle(json.title);
+              if (isValidRole(cleanTitle)) result.role = cleanTitle;
             }
-            if (loc && !result.location) result.location = loc;
-          }
-          if (json.baseSalary) {
-            const val = json.baseSalary.value;
-            if (typeof val === "object" && (val.minValue || val.value)) {
-              const cur = json.baseSalary.currency || "$";
-              result.salary = `${cur}${val.minValue || val.value}${val.maxValue ? " - " + cur + val.maxValue : ""}`;
-            } else if (typeof val === "string" || typeof val === "number") {
-              result.salary = String(val);
+            if (json.identifier) {
+              const idVal = typeof json.identifier === "string" ? json.identifier : (json.identifier.value || json.identifier.name);
+              if (idVal && !result.jobId) result.jobId = decodeHTMLEntities(String(idVal));
+            }
+            if (!result.jobId && json.jobPostingId) result.jobId = decodeHTMLEntities(String(json.jobPostingId));
+            if (json.hiringOrganization) {
+              const org = typeof json.hiringOrganization === "string" ? json.hiringOrganization : json.hiringOrganization.name;
+              if (org) {
+                const cleanOrg = decodeHTMLEntities(org);
+                if (isValidCompany(cleanOrg) && !result.company) result.company = cleanOrg;
+              }
+            }
+            if (json.jobLocation) {
+              let loc = "";
+              const addr = json.jobLocation.address;
+              if (typeof addr === "string") loc = addr;
+              else if (addr && typeof addr === "object") {
+                loc = [addr.addressLocality, addr.addressRegion, addr.addressCountry].filter(Boolean).join(", ");
+              }
+              if (loc && !result.location) result.location = decodeHTMLEntities(loc);
+            }
+            if (json.baseSalary) {
+              const val = json.baseSalary.value;
+              if (typeof val === "object" && (val.minValue || val.value)) {
+                const cur = json.baseSalary.currency || "$";
+                result.salary = decodeHTMLEntities(`${cur}${val.minValue || val.value}${val.maxValue ? " - " + cur + val.maxValue : ""}`);
+              } else if (typeof val === "string" || typeof val === "number") {
+                result.salary = decodeHTMLEntities(String(val));
+              }
+            }
+            if (json.description && result.keyRequirements.length === 0) {
+              const tmp = document.createElement("div");
+              tmp.innerHTML = json.description;
+              const lis = tmp.querySelectorAll("li");
+              if (lis.length > 0) {
+                const bullets = Array.from(lis)
+                  .map(li => decodeHTMLEntities(li.textContent))
+                  .filter(t => t.length > 15 && t.length < 250);
+                if (bullets.length > 0) result.keyRequirements = bullets.slice(0, 8);
+              }
             }
           }
-          if (json.description && result.keyRequirements.length === 0) {
-            const tmp = document.createElement("div");
-            tmp.innerHTML = json.description;
-            const lis = tmp.querySelectorAll("li");
-            if (lis.length > 0) {
-              const bullets = Array.from(lis)
-                .map(li => li.textContent.trim())
-                .filter(t => t.length > 15 && t.length < 250);
-              if (bullets.length > 0) result.keyRequirements = bullets.slice(0, 8);
-            }
+        } catch (e) {}
+      }
+    } catch (e) {}
+
+    // 2. High-accuracy platform selectors
+    const host = window.location.hostname.toLowerCase();
+
+    if (host.includes("linkedin.com")) {
+      const titleEl = document.querySelector(".job-details-jobs-unified-top-card__job-title, .jobs-unified-top-card__job-title, h1.topcard__title, .t-24.job-details-jobs-unified-top-card__job-title");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+
+      const companyEl = document.querySelector(".job-details-jobs-unified-top-card__company-name, .jobs-unified-top-card__company-name, .topcard__org-name-link");
+      if (companyEl && !result.company) {
+        const c = decodeHTMLEntities(companyEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
+
+      const locEl = document.querySelector(".job-details-jobs-unified-top-card__bullet, .jobs-unified-top-card__bullet, .topcard__flavor--bullet");
+      if (locEl && !result.location) result.location = decodeHTMLEntities(locEl.textContent);
+    } else if (host.includes("indeed.com")) {
+      const titleEl = document.querySelector("h1.jobsearch-JobInfoHeader-title, [data-testid='jobsearch-JobInfoHeader-title']");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+
+      const companyEl = document.querySelector("[data-testid='inlineHeader-companyName'], .jobsearch-InlineCompanyRating-companyHeader");
+      if (companyEl && !result.company) {
+        const c = decodeHTMLEntities(companyEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
+
+      const locEl = document.querySelector("[data-testid='inlineHeader-companyLocation'], #inlineHeader-companyLocation");
+      if (locEl && !result.location) result.location = decodeHTMLEntities(locEl.textContent);
+    } else if (host.includes("greenhouse.io")) {
+      const titleEl = document.querySelector(".app-title, h1.job-title, [data-qa='job-title']");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+
+      const companyEl = document.querySelector(".company-name, [data-qa='company-name']");
+      if (companyEl && !result.company) {
+        const c = decodeHTMLEntities(companyEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
+
+      const locEl = document.querySelector(".location");
+      if (locEl && !result.location) result.location = decodeHTMLEntities(locEl.textContent);
+    } else if (host.includes("lever.co")) {
+      const titleEl = document.querySelector(".posting-headline h2, h2.posting-headline");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+
+      const companyEl = document.querySelector(".main-header-logo img")?.getAttribute("alt") || document.querySelector(".posting-header .company");
+      if (companyEl && !result.company) {
+        const cName = typeof companyEl === "string" ? companyEl : companyEl.textContent;
+        const clean = decodeHTMLEntities(cName).replace(/ logo/i, "").trim();
+        if (isValidCompany(clean)) result.company = clean;
+      }
+
+      const locEl = document.querySelector(".posting-categories .location");
+      if (locEl && !result.location) result.location = decodeHTMLEntities(locEl.textContent);
+    } else if (host.includes("ashbyhq.com")) {
+      const titleEl = document.querySelector("h1");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+
+      const locEl = document.querySelector("[class*='location'], [class*='Location']");
+      if (locEl && !result.location) result.location = decodeHTMLEntities(locEl.textContent);
+    } else if (host.includes("myworkdayjobs.com") || host.includes("workday")) {
+      // Workday specific extraction
+
+      // 1. Role extraction
+      const wdTitleEl = document.querySelector(
+        '[data-automation-id="jobPostingHeader"], [data-automation-id="jobPostingTitle"], [data-automation-id="jobTitle"], h1[data-automation-id="jobPostingHeader"], h2[data-automation-id="jobPostingTitle"], h1'
+      );
+      if (wdTitleEl && !result.role) {
+        const r = cleanRoleTitle(wdTitleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+
+      // 2. OpenGraph site_name or meta tags
+      const metaSite = document.querySelector("meta[property='og:site_name']")?.getAttribute("content");
+      if (metaSite) {
+        const cleanSite = decodeHTMLEntities(metaSite);
+        if (isValidCompany(cleanSite) && !result.company) result.company = cleanSite;
+      }
+
+      // 3. Banner logo alt or title (strictly logo elements, never search/nav buttons)
+      if (!result.company) {
+        const bannerImg = document.querySelector(
+          '[data-automation-id="bannerLogo"] img, [data-automation-id="legalEntityBanner"] img, [data-automation-id="logo"] img, header a[data-automation-id*="logo"] img'
+        );
+        const alt = bannerImg?.getAttribute("alt") || bannerImg?.getAttribute("title");
+        if (alt) {
+          const cleanAlt = decodeHTMLEntities(alt).replace(/\s*(?:logo|icon|home|banner)\s*/gi, "").trim();
+          if (isValidCompany(cleanAlt)) result.company = cleanAlt;
+        }
+      }
+
+      // 4. Banner text / legal entity
+      if (!result.company) {
+        const bannerEl = document.querySelector('[data-automation-id="legalEntityBanner"], [data-automation-id="bannerLogo"] a, [data-automation-id="aboutUsCompany"]');
+        if (bannerEl) {
+          const txt = decodeHTMLEntities(bannerEl.textContent).replace(/\s*(?:Careers|Jobs|Home)\s*$/i, "").trim();
+          if (isValidCompany(txt)) result.company = txt;
+        }
+      }
+
+      // 5. Subdomain extraction: e.g. "entrust.wd1.myworkdayjobs.com" -> "Entrust"
+      if (!result.company) {
+        const wdHostMatch = window.location.hostname.match(/^([a-z0-9_-]+?)(?:\.wd\d+)?\.myworkdayjobs\.com/i);
+        if (wdHostMatch && wdHostMatch[1]) {
+          let slug = wdHostMatch[1].replace(/[-_]/g, " ");
+          slug = slug.replace(/\bgroup\b/i, " Group").replace(/\b(careers?|jobs?)\b/gi, "").trim();
+          const formatted = slug.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+          if (isValidCompany(formatted)) result.company = formatted;
+        }
+      }
+
+      // 6. Path extraction e.g. /en-US/Perseus-careers1/job/...
+      if (!result.company) {
+        const pathParts = window.location.pathname.split("/").filter(Boolean);
+        for (const part of pathParts) {
+          if (/^en-[A-Za-z]{2,4}$/i.test(part) || /^(job|jobs|details)$/i.test(part) || !isValidCompany(part)) continue;
+          const candidate = part.replace(/[-_](?:careers|jobs)\d*$/i, "").replace(/[-_]/g, " ").replace(/\d+$/, "").trim();
+          const formatted = candidate.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+          if (isValidCompany(formatted)) {
+            result.company = formatted;
+            break;
           }
         }
-      } catch (e) {}
-    }
-  } catch (e) {}
+      }
 
-  // 2. High-accuracy platform selectors
-  const host = window.location.hostname.toLowerCase();
-
-  if (host.includes("linkedin.com")) {
-    const titleEl = document.querySelector(".job-details-jobs-unified-top-card__job-title, .jobs-unified-top-card__job-title, h1.topcard__title, .t-24.job-details-jobs-unified-top-card__job-title");
-    if (titleEl && !result.role) result.role = titleEl.textContent.trim();
-
-    const companyEl = document.querySelector(".job-details-jobs-unified-top-card__company-name, .jobs-unified-top-card__company-name, .topcard__org-name-link");
-    if (companyEl && !result.company) {
-      const c = companyEl.textContent.trim();
-      if (isValidCompany(c)) result.company = c;
-    }
-
-    const locEl = document.querySelector(".job-details-jobs-unified-top-card__bullet, .jobs-unified-top-card__bullet, .topcard__flavor--bullet");
-    if (locEl && !result.location) result.location = locEl.textContent.trim();
-  } else if (host.includes("indeed.com")) {
-    const titleEl = document.querySelector("h1.jobsearch-JobInfoHeader-title, [data-testid='jobsearch-JobInfoHeader-title']");
-    if (titleEl && !result.role) result.role = titleEl.textContent.trim();
-
-    const companyEl = document.querySelector("[data-testid='inlineHeader-companyName'], .jobsearch-InlineCompanyRating-companyHeader");
-    if (companyEl && !result.company) {
-      const c = companyEl.textContent.trim();
-      if (isValidCompany(c)) result.company = c;
-    }
-
-    const locEl = document.querySelector("[data-testid='inlineHeader-companyLocation'], #inlineHeader-companyLocation");
-    if (locEl && !result.location) result.location = locEl.textContent.trim();
-  } else if (host.includes("greenhouse.io")) {
-    const titleEl = document.querySelector(".app-title, h1.job-title");
-    if (titleEl && !result.role) result.role = titleEl.textContent.trim();
-
-    const companyEl = document.querySelector(".company-name");
-    if (companyEl && !result.company) {
-      const c = companyEl.textContent.trim();
-      if (isValidCompany(c)) result.company = c;
+      // 7. Location
+      if (!result.location) {
+        const locEl = document.querySelector('[data-automation-id="jobPostingLocation"], [data-automation-id="locations"], dd[data-automation-id="jobPostingLocation"]');
+        if (locEl) result.location = decodeHTMLEntities(locEl.textContent);
+      }
+    } else if (host.includes("smartrecruiters.com")) {
+      const titleEl = document.querySelector("h1.job-title, [itemprop='title'], h1");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+      const companyEl = document.querySelector(".company-name, [itemprop='hiringOrganization']");
+      if (companyEl && !result.company) {
+        const c = decodeHTMLEntities(companyEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
+    } else if (host.includes("bamboohr.com")) {
+      const titleEl = document.querySelector("h1, .job-detail-title, [data-qa='job-title']");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+      const m = host.match(/^([a-z0-9_-]+)\.bamboohr\.com/i);
+      if (m && !result.company) {
+        const c = m[1].replace(/[-_]/g, " ").replace(/\b[a-z]/g, ch => ch.toUpperCase());
+        if (isValidCompany(c)) result.company = c;
+      }
     }
 
-    const locEl = document.querySelector(".location");
-    if (locEl && !result.location) result.location = locEl.textContent.trim();
-  } else if (host.includes("lever.co")) {
-    const titleEl = document.querySelector(".posting-headline h2");
-    if (titleEl && !result.role) result.role = titleEl.textContent.trim();
+    // 2.5 Post-application / confirmation page text parsing
+    // E.g. "Thank you for applying to the Software Engineer position at Acme Corp"
+    // or "Your application for Senior Frontend Developer has been submitted"
+    try {
+      const confirmationRoleEl = document.querySelector('[data-automation-id="jobPostingTitle"], [data-automation-id="compositeHeaderSubTitle"], [data-automation-id="jobTitle"], .gwt-Label.job-title, [data-qa="job-title"]');
+      if (confirmationRoleEl) {
+        const cRole = cleanRoleTitle(confirmationRoleEl.textContent);
+        if (isValidRole(cRole) && !result.role) result.role = cRole;
+      }
 
-    const companyEl = document.querySelector(".main-header-logo img")?.getAttribute("alt") || document.querySelector(".posting-header .company");
-    if (companyEl && !result.company) {
-      const cName = typeof companyEl === "string" ? companyEl : companyEl.textContent;
-      const clean = cName.replace(/ logo/i, "").trim();
-      if (isValidCompany(clean)) result.company = clean;
+      const pageText = document.body.innerText || "";
+      if (!result.role || !result.company) {
+        const matchAppliedAt = pageText.match(/(?:applied to|application for)(?:\s+the)?\s+([A-Za-z0-9\s/.,#-]{3,60}?)(?:\s+(?:position|role))?\s+at\s+([A-Za-z0-9\s&.,'-]{2,50})/i);
+        if (matchAppliedAt) {
+          const parsedRole = cleanRoleTitle(matchAppliedAt[1]);
+          const parsedCompany = decodeHTMLEntities(matchAppliedAt[2]);
+          if (!result.role && isValidRole(parsedRole)) result.role = parsedRole;
+          if (!result.company && isValidCompany(parsedCompany)) result.company = parsedCompany;
+        }
+      }
+
+      if (!result.role) {
+        const matchForRole = pageText.match(/application for(?:\s+the)?\s+([A-Za-z0-9\s/.,#-]{3,60}?)\s+(?:has been|is)/i);
+        if (matchForRole) {
+          const parsedRole = cleanRoleTitle(matchForRole[1]);
+          if (isValidRole(parsedRole)) result.role = parsedRole;
+        }
+      }
+    } catch (e) {}
+
+    // 3. Generic DOM fallbacks
+    if (!result.role) {
+      const h1 = document.querySelector("h1");
+      if (h1) {
+        const r = cleanRoleTitle(h1.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+      if (!result.role) {
+        let t = decodeHTMLEntities(document.title || "");
+        t = t.replace(/\s*[-–|•]\s*(LinkedIn|Indeed|Glassdoor|Greenhouse|Lever|Ashby|Workday|SmartRecruiters|Jobs).*$/i, "");
+        const parts = t.split(/\s*[-–|]\s*/);
+        if (parts.length >= 2) {
+          const rCand = cleanRoleTitle(parts[0]);
+          if (isValidRole(rCand)) result.role = rCand;
+          if (!result.company) {
+            const compCandidate = decodeHTMLEntities(parts[1]).replace(/\b(Jobs|Careers|Indeed|LinkedIn|Workday)\b/gi, "").trim();
+            if (isValidCompany(compCandidate)) result.company = compCandidate;
+          }
+        } else if (isValidRole(t)) {
+          result.role = cleanRoleTitle(t);
+        }
+      }
     }
 
-    const locEl = document.querySelector(".posting-categories .location");
-    if (locEl && !result.location) result.location = locEl.textContent.trim();
-  } else if (host.includes("ashbyhq.com")) {
-    const titleEl = document.querySelector("h1");
-    if (titleEl && !result.role) result.role = titleEl.textContent.trim();
-
-    const locEl = document.querySelector("[class*='location'], [class*='Location']");
-    if (locEl && !result.location) result.location = locEl.textContent.trim();
-  } else if (host.includes("myworkdayjobs.com") || host.includes("workday")) {
-    // Workday specific extraction
-    // 1. Banner logo alt or title
-    const bannerImg = document.querySelector('[data-automation-id="bannerLogo"] img, header img[alt], [data-automation-id="legalEntityBanner"] img, [data-automation-id="logo"] img');
-    const alt = bannerImg?.getAttribute("alt") || bannerImg?.getAttribute("title");
-    if (alt) {
-      const cleanAlt = alt.replace(/\s*(?:logo|icon|home|banner)\s*/gi, "").trim();
-      if (isValidCompany(cleanAlt)) result.company = cleanAlt;
-    }
-
-    // 2. Banner text / legal entity
+    // Robust company detection across any page
+    // A. OpenGraph site name (authoritative brand name)
     if (!result.company) {
-      const bannerEl = document.querySelector('[data-automation-id="legalEntityBanner"], [data-automation-id="bannerLogo"]');
-      if (bannerEl) {
-        const txt = bannerEl.textContent.trim().replace(/\s*(?:Careers|Jobs|Home)\s*$/i, "").trim();
+      const metaSite = document.querySelector("meta[property='og:site_name'], meta[name='application-name']")?.getAttribute("content");
+      if (metaSite) {
+        const clean = decodeHTMLEntities(metaSite);
+        if (isValidCompany(clean)) result.company = clean;
+      }
+    }
+
+    // B. Logo image alt text (specifically on brand/logo elements, NEVER general header icons)
+    if (!result.company) {
+      const logoImg = document.querySelector(
+        'header a[class*="logo"] img[alt], header a[class*="brand"] img[alt], [class*="header"] [class*="logo"] img[alt], [class*="nav"] [class*="logo"] img[alt], a[class*="navbar-brand"] img[alt], [id*="logo"] img[alt]'
+      );
+      const alt = logoImg?.getAttribute("alt") || logoImg?.getAttribute("title");
+      if (alt) {
+        const clean = decodeHTMLEntities(alt).replace(/\s*(?:logo|icon|image|home|avatar)\s*/gi, "").trim();
+        if (isValidCompany(clean)) result.company = clean;
+      }
+    }
+
+    // C. Top-left brand / logo link text (specifically brand/logo classes, NOT generic header links)
+    if (!result.company) {
+      const brandEl = document.querySelector(
+        'header a[class*="brand"], header a[class*="logo"], nav a[class*="brand"], nav a[class*="logo"], a[class*="navbar-brand"], [class*="header-logo"]'
+      );
+      if (brandEl) {
+        const txt = decodeHTMLEntities(brandEl.textContent).replace(/\s*(?:Careers|Jobs|Home|Portal)\s*$/i, "").trim();
         if (isValidCompany(txt)) result.company = txt;
       }
     }
 
-    // 3. Subdomain extraction: e.g. "perseusgroup.wd3.myworkdayjobs.com"
+    // D. Dedicated company data attributes and selectors
     if (!result.company) {
-      const wdHostMatch = window.location.hostname.match(/^([a-z0-9_-]+?)(?:\.wd\d+)?\.myworkdayjobs\.com/i);
-      if (wdHostMatch && wdHostMatch[1]) {
-        let slug = wdHostMatch[1].replace(/[-_]/g, " ");
-        slug = slug.replace(/\bgroup\b/i, " Group").replace(/\b(careers?|jobs?)\b/gi, "").trim();
-        const formatted = slug.replace(/\b[a-z]/g, (c) => c.toUpperCase());
-        if (isValidCompany(formatted)) result.company = formatted;
+      const compEl = document.querySelector('[data-company], [class*="company-name"], [class*="companyName"], [class*="employer-name"], [data-automation-id*="company"]');
+      if (compEl) {
+        const txt = decodeHTMLEntities(compEl.textContent).trim();
+        if (isValidCompany(txt)) result.company = txt;
       }
     }
 
-    // 4. Path extraction e.g. /en-US/Perseus-careers1/job/...
+    // E. Title split fallback
     if (!result.company) {
-      const pathParts = window.location.pathname.split("/").filter(Boolean);
-      for (const part of pathParts) {
-        if (/^en-[A-Za-z]{2,4}$/i.test(part) || /^(job|jobs|details)$/i.test(part) || !isValidCompany(part)) continue;
-        const candidate = part.replace(/[-_](?:careers|jobs)\d*$/i, "").replace(/[-_]/g, " ").replace(/\d+$/, "").trim();
-        const formatted = candidate.replace(/\b[a-z]/g, (c) => c.toUpperCase());
-        if (isValidCompany(formatted)) {
-          result.company = formatted;
-          break;
-        }
-      }
-    }
-  }
-
-  // 2.5 Post-application / confirmation page text parsing
-  // E.g. "Thank you for applying to the Software Engineer position at Acme Corp"
-  // or "Your application for Senior Frontend Developer has been submitted"
-  try {
-    const confirmationRoleEl = document.querySelector('[data-automation-id="jobPostingTitle"], [data-automation-id="compositeHeaderSubTitle"], [data-automation-id="jobTitle"], .gwt-Label.job-title, [data-qa="job-title"]');
-    if (confirmationRoleEl) {
-      const cRole = confirmationRoleEl.textContent.trim();
-      if (isValidRole(cRole) && !result.role) result.role = cRole;
-    }
-
-    const pageText = document.body.innerText || "";
-    if (!result.role || !result.company) {
-      const matchAppliedAt = pageText.match(/(?:applied to|application for)(?:\s+the)?\s+([A-Za-z0-9\s/.,#-]{3,60}?)(?:\s+(?:position|role))?\s+at\s+([A-Za-z0-9\s&.,'-]{2,50})/i);
-      if (matchAppliedAt) {
-        if (!result.role && isValidRole(matchAppliedAt[1])) result.role = matchAppliedAt[1].trim();
-        if (!result.company && isValidCompany(matchAppliedAt[2])) result.company = matchAppliedAt[2].trim();
-      }
-    }
-
-    if (!result.role) {
-      const matchForRole = pageText.match(/application for(?:\s+the)?\s+([A-Za-z0-9\s/.,#-]{3,60}?)\s+(?:has been|is)/i);
-      if (matchForRole && isValidRole(matchForRole[1])) {
-        result.role = matchForRole[1].trim();
-      }
-    }
-  } catch (e) {}
-
-  // 3. Generic DOM fallbacks
-  if (!result.role) {
-    const h1 = document.querySelector("h1");
-    if (h1 && isValidRole(h1.textContent)) {
-      result.role = h1.textContent.trim();
-    } else {
-      let t = document.title || "";
-      t = t.replace(/\s*[-–|•]\s*(LinkedIn|Indeed|Glassdoor|Greenhouse|Lever|Ashby|Workday|Jobs).*$/i, "");
-      const parts = t.split(/\s*[-–|]\s*/);
-      if (parts.length >= 2) {
-        if (isValidRole(parts[0])) result.role = parts[0].trim();
-        if (!result.company) {
-          const compCandidate = parts[1].replace(/\b(Jobs|Careers|Indeed|LinkedIn|Workday)\b/gi, "").trim();
-          if (isValidCompany(compCandidate)) result.company = compCandidate;
-        }
-      } else if (isValidRole(t)) {
-        result.role = t.trim();
-      }
-    }
-  }
-
-  // Robust company detection across any page
-  if (!result.company) {
-    // A. Logo image alt text
-    const logoImg = document.querySelector('header a img[alt], [class*="header"] a img[alt], [class*="nav"] a img[alt], [class*="logo"] img[alt], a[class*="brand"] img[alt], a[class*="logo"] img[alt]');
-    const alt = logoImg?.getAttribute("alt") || logoImg?.getAttribute("title");
-    if (alt) {
-      const clean = alt.replace(/\s*(?:logo|icon|image|home|avatar)\s*/gi, "").trim();
-      if (isValidCompany(clean)) result.company = clean;
-    }
-  }
-
-  if (!result.company) {
-    // B. Top-left brand / logo text
-    const brandEl = document.querySelector('header a, nav a, [class*="brand"], [class*="logo"]');
-    if (brandEl) {
-      const txt = brandEl.textContent.trim().replace(/\s*(?:Careers|Jobs|Home|Portal)\s*$/i, "").trim();
-      if (isValidCompany(txt)) result.company = txt;
-    }
-  }
-
-  if (!result.company) {
-    // C. Dedicated company data attributes and selectors
-    const compEl = document.querySelector('[data-company], [class*="company-name"], [class*="companyName"], [class*="employer-name"], [data-automation-id*="company"]');
-    if (compEl) {
-      const txt = compEl.textContent.trim();
-      if (isValidCompany(txt)) result.company = txt;
-    }
-  }
-
-  if (!result.company) {
-    // D. OpenGraph site name or title split
-    const metaSite = document.querySelector("meta[property='og:site_name']")?.getAttribute("content");
-    if (metaSite && isValidCompany(metaSite)) {
-      result.company = metaSite.trim();
-    } else {
-      const parts = document.title.split(/\s*[-–|]\s*/);
+      const parts = decodeHTMLEntities(document.title || "").split(/\s*[-–|]\s*/);
       if (parts.length >= 2) {
         const compCandidate = parts[1].replace(/\b(Jobs|Careers|Indeed|LinkedIn|Workday)\b/gi, "").trim();
         if (isValidCompany(compCandidate)) result.company = compCandidate;
+        if (!result.company && isValidCompany(parts[0])) {
+          const compCandidate0 = parts[0].replace(/\b(Jobs|Careers|Indeed|LinkedIn|Workday)\b/gi, "").trim();
+          if (isValidCompany(compCandidate0)) result.company = compCandidate0;
+        }
       }
     }
-  }
 
-  if (!result.company) {
-    // E. Text search for "About [Company]" or "[Company] is an Equal Opportunity"
-    const bodyText = document.body.innerText || "";
-    const eoeMatch = bodyText.match(/([A-Z][A-Za-z0-9\s&]{2,30}?)\s+is\s+an\s+equal\s+opportunity\s+employer/i);
-    if (eoeMatch && isValidCompany(eoeMatch[1])) {
-      result.company = eoeMatch[1].trim();
-    } else {
-      const aboutMatch = bodyText.match(/(?:About|Join)\s+([A-Z][A-Za-z0-9\s&]{2,25}?)(?:\s+is\b|\s*,|\s+we\b|\n)/);
-      if (aboutMatch && isValidCompany(aboutMatch[1])) {
-        result.company = aboutMatch[1].trim();
+    // F. Text search for "About [Company]" or "[Company] is an Equal Opportunity"
+    if (!result.company) {
+      const bodyText = document.body.innerText || "";
+      const eoeMatch = bodyText.match(/([A-Z][A-Za-z0-9\s&]{2,30}?)\s+is\s+an\s+equal\s+opportunity\s+employer/i);
+      if (eoeMatch) {
+        const cand = decodeHTMLEntities(eoeMatch[1]);
+        if (isValidCompany(cand)) result.company = cand;
+      } else {
+        const aboutMatch = bodyText.match(/(?:About|Join)\s+([A-Z][A-Za-z0-9\s&]{2,25}?)(?:\s+is\b|\s*,|\s+we\b|\n)/);
+        if (aboutMatch) {
+          const cand = decodeHTMLEntities(aboutMatch[1]);
+          if (isValidCompany(cand)) result.company = cand;
+        }
       }
     }
-  }
 
-  // Final validation to reject any junk words
-  if (!isValidCompany(result.company)) {
-    result.company = "";
-  }
+    // Final validation to reject any junk words
+    if (!isValidCompany(result.company)) {
+      result.company = "";
+    }
 
   if (!result.salary) {
     const salaryMatch = document.body.innerText.match(/(\$|£|€)\s*\d{2,3}(?:,\d{3})*(?:\s*(?:k|K|\/yr|\/year|\/hr|-|\bto\b)\s*(?:\$|£|€)?\s*\d{2,3}(?:,\d{3})*(?:\s*(?:k|K|\/yr|\/year))?)?/);
@@ -443,6 +571,23 @@ function scrapePageDetails() {
         if (reqMatch) result.jobId = reqMatch[1].toUpperCase();
       }
     } catch (e) {}
+
+    // Final cleanup: decode HTML entities and trim all fields
+    result.company = decodeHTMLEntities(result.company);
+    result.role = cleanRoleTitle(result.role);
+    result.location = decodeHTMLEntities(result.location);
+    result.salary = decodeHTMLEntities(result.salary);
+    result.jobId = decodeHTMLEntities(result.jobId);
+    if (Array.isArray(result.keyRequirements)) {
+      result.keyRequirements = result.keyRequirements.map(decodeHTMLEntities).filter(Boolean);
+    }
+
+    if (!isValidCompany(result.company)) {
+      result.company = "";
+    }
+    if (!isValidRole(result.role)) {
+      result.role = "";
+    }
 
     return result;
   } catch (err) {
@@ -1073,10 +1218,19 @@ async function captureActiveTab() {
     const salaryInput = document.getElementById("salary");
     const locationInput = document.getElementById("location");
 
-    if (companyInput && data.company) companyInput.value = data.company;
-    if (roleInput && data.role) roleInput.value = data.role;
-    if (salaryInput) salaryInput.value = isSalaryActive && data.salary ? data.salary : "";
-    if (locationInput) locationInput.value = isLocationActive && data.location ? data.location : "";
+    let companyVal = (data.company || "").trim();
+    if (!companyVal && tab.url) {
+      const wdMatch = tab.url.match(/https?:\/\/([a-z0-9_-]+?)(?:\.wd\d+)?\.myworkdayjobs\.com/i);
+      if (wdMatch && wdMatch[1]) {
+        let s = wdMatch[1].replace(/[-_]/g, " ").replace(/\b(careers?|jobs?)\b/gi, "").trim();
+        companyVal = s.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+      }
+    }
+
+    if (companyInput && companyVal) companyInput.value = companyVal;
+    if (roleInput && data.role) roleInput.value = data.role.trim();
+    if (salaryInput) salaryInput.value = isSalaryActive && data.salary ? data.salary.trim() : "";
+    if (locationInput) locationInput.value = isLocationActive && data.location ? data.location.trim() : "";
     if (urlInput) urlInput.value = isUrlActive ? (data.url || tab.url || "") : "";
     currentJobId = data.jobId || extractJobIdFromUrl(tab.url) || "";
 
