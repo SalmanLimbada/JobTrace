@@ -90,7 +90,7 @@ export default function ScrollNav() {
   return (
     <aside
       aria-label="Quick scroll navigation"
-      className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] right-3 sm:bottom-6 sm:right-6 z-40 flex flex-col bg-[#161b22]/95 border border-[#30363d] rounded-lg shadow-2xl backdrop-blur-md overflow-hidden divide-y divide-[#30363d]/60 select-none animate-in fade-in zoom-in-95 duration-150"
+      className="scroll-nav-dock fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] right-3 sm:bottom-6 sm:right-6 z-40 flex flex-col bg-[#161b22]/95 border border-[#30363d] rounded-lg shadow-2xl backdrop-blur-md overflow-hidden divide-y divide-[#30363d]/60 select-none animate-in fade-in zoom-in-95 duration-150"
     >
       {/* 1. All the way to top */}
       <button
@@ -99,7 +99,7 @@ export default function ScrollNav() {
         disabled={atTop}
         title="Jump all the way to top"
         aria-label="Jump all the way to top"
-        className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
+        className="scroll-nav-btn w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
       >
         <svg
           className="w-3.5 h-3.5"
@@ -121,7 +121,7 @@ export default function ScrollNav() {
         disabled={atTop}
         title="Scroll up (little by little) · Double-click for top"
         aria-label="Scroll up"
-        className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
+        className="scroll-nav-btn w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
       >
         <svg
           className="w-3.5 h-3.5"
@@ -142,7 +142,7 @@ export default function ScrollNav() {
         disabled={atBottom}
         title="Scroll down (little by little) · Double-click for bottom"
         aria-label="Scroll down"
-        className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
+        className="scroll-nav-btn w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
       >
         <svg
           className="w-3.5 h-3.5"
@@ -162,7 +162,7 @@ export default function ScrollNav() {
         disabled={atBottom}
         title="Jump all the way to bottom"
         aria-label="Jump all the way to bottom"
-        className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
+        className="scroll-nav-btn w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
       >
         <svg
           className="w-3.5 h-3.5"
