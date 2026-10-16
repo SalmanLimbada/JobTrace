@@ -1,9 +1,25 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useCallback, ReactNode } from "react";
 import type { CustomFieldDefinition, CustomFieldType } from "@/types/job";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 export type AppTheme = "dark" | "light";
+
+export type CloudSyncStatus = "synced" | "syncing" | "local";
+
+export interface CloudSettingsPayload {
+  theme: AppTheme;
+  customFields: CustomFieldDefinition[];
+  standardColumns: StandardColumnsSettings;
+  showRowNumbers: boolean;
+  columnOrder: string[];
+  shortcuts: ShortcutSettings;
+  statuses: string[];
+  extensionSettings: ExtensionSettings;
+  updatedAt?: string;
+}
 
 export interface StandardColumnsSettings {
   company: boolean;
@@ -139,6 +155,8 @@ interface SettingsContextType {
   setColumnVisible: (column: string, visible: boolean) => void;
   extensionSettings: ExtensionSettings;
   updateExtensionSettings: (partial: Partial<ExtensionSettings>) => void;
+  cloudSyncStatus: CloudSyncStatus;
+  syncToCloud: () => Promise<void>;
   applySettings: (payload: {
     showRowNumbers: boolean;
     standardColumns: StandardColumnsSettings;
@@ -161,6 +179,10 @@ const STORAGE_STATUSES_KEY = "jobtrace_statuses_v1";
 const STORAGE_EXTENSION_SETTINGS_KEY = "jobtrace_extension_settings";
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<CloudSyncStatus>("local");
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [theme, setThemeState] = useState<AppTheme>("dark");
   const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(DEFAULT_FIELDS);
   const [standardColumns, setStandardColumns] = useState<StandardColumnsSettings>(DEFAULT_STANDARD_COLUMNS);
@@ -170,6 +192,118 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [statuses, setStatusesState] = useState<string[]>(DEFAULT_STATUSES);
   const [extensionSettings, setExtensionSettings] = useState<ExtensionSettings>(DEFAULT_EXTENSION_SETTINGS);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const latestSettingsRef = useRef<CloudSettingsPayload>({
+    theme,
+    customFields,
+    standardColumns,
+    showRowNumbers,
+    columnOrder,
+    shortcuts,
+    statuses,
+    extensionSettings,
+  });
+
+  useEffect(() => {
+    latestSettingsRef.current = {
+      theme,
+      customFields,
+      standardColumns,
+      showRowNumbers,
+      columnOrder,
+      shortcuts,
+      statuses,
+      extensionSettings,
+    };
+  }, [theme, customFields, standardColumns, showRowNumbers, columnOrder, shortcuts, statuses, extensionSettings]);
+
+  const syncToCloud = useCallback(async (customSnapshot?: Partial<CloudSettingsPayload>) => {
+    if (!user) {
+      setCloudSyncStatus("local");
+      return;
+    }
+    setCloudSyncStatus("syncing");
+    try {
+      const payload: CloudSettingsPayload = {
+        ...latestSettingsRef.current,
+        updatedAt: new Date().toISOString(),
+        ...customSnapshot,
+      };
+      const { error } = await supabase.auth.updateUser({
+        data: { jobtrace_settings: payload },
+      });
+      if (error) {
+        console.warn("Failed to sync settings to Supabase:", error.message);
+        setCloudSyncStatus("local");
+      } else {
+        setCloudSyncStatus("synced");
+      }
+    } catch (err) {
+      console.warn("Failed to sync settings to Supabase:", err);
+      setCloudSyncStatus("local");
+    }
+  }, [user]);
+
+  const scheduleCloudSync = useCallback((customSnapshot?: Partial<CloudSettingsPayload>) => {
+    if (!user) return;
+    setCloudSyncStatus("syncing");
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      syncToCloud(customSnapshot);
+    }, 600);
+  }, [user, syncToCloud]);
+
+  // Hydrate settings when authenticated user session is active
+  useEffect(() => {
+    if (!user) {
+      setCloudSyncStatus("local");
+      return;
+    }
+
+    const cloudData = user.user_metadata?.jobtrace_settings as CloudSettingsPayload | undefined;
+    if (cloudData && typeof cloudData === "object" && Object.keys(cloudData).length > 0) {
+      if (cloudData.theme === "light" || cloudData.theme === "dark") {
+        setThemeState(cloudData.theme);
+        document.documentElement.setAttribute("data-theme", cloudData.theme);
+        try { localStorage.setItem(STORAGE_THEME_KEY, cloudData.theme); } catch {}
+      }
+      if (Array.isArray(cloudData.customFields)) {
+        setCustomFields(cloudData.customFields);
+        try { localStorage.setItem(STORAGE_FIELDS_KEY, JSON.stringify(cloudData.customFields)); } catch {}
+      }
+      if (cloudData.standardColumns && typeof cloudData.standardColumns === "object") {
+        setStandardColumns(cloudData.standardColumns);
+        try { localStorage.setItem(STORAGE_STANDARD_COLS_KEY, JSON.stringify(cloudData.standardColumns)); } catch {}
+      }
+      if (typeof cloudData.showRowNumbers === "boolean") {
+        setShowRowNumbersState(cloudData.showRowNumbers);
+        try { localStorage.setItem(STORAGE_ROW_NUMBERS_KEY, String(cloudData.showRowNumbers)); } catch {}
+      }
+      if (Array.isArray(cloudData.columnOrder)) {
+        setColumnOrderState(cloudData.columnOrder);
+        try { localStorage.setItem(STORAGE_COLUMN_ORDER_KEY, JSON.stringify(cloudData.columnOrder)); } catch {}
+      }
+      if (cloudData.shortcuts && typeof cloudData.shortcuts === "object") {
+        setShortcutsState(cloudData.shortcuts);
+        try { localStorage.setItem(STORAGE_SHORTCUTS_KEY, JSON.stringify(cloudData.shortcuts)); } catch {}
+      }
+      if (Array.isArray(cloudData.statuses)) {
+        setStatusesState(cloudData.statuses);
+        try { localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(cloudData.statuses)); } catch {}
+      }
+      if (cloudData.extensionSettings && typeof cloudData.extensionSettings === "object") {
+        setExtensionSettings(cloudData.extensionSettings);
+        try { localStorage.setItem(STORAGE_EXTENSION_SETTINGS_KEY, JSON.stringify(cloudData.extensionSettings)); } catch {}
+      }
+      setCloudSyncStatus("synced");
+      window.dispatchEvent(new Event("jobtrace_settings_updated"));
+    } else {
+      // First login with no cloud settings yet: backup current settings to cloud
+      syncToCloud();
+    }
+  }, [user, syncToCloud]);
 
   useEffect(() => {
     try {
@@ -287,6 +421,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_THEME_KEY, newTheme);
     } catch {}
+    scheduleCloudSync({ theme: newTheme });
   };
 
   const toggleTheme = () => {
@@ -299,6 +434,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_ROW_NUMBERS_KEY, String(show));
     } catch {}
+    scheduleCloudSync({ showRowNumbers: show });
   };
 
   const toggleShowRowNumbers = () => {
@@ -315,6 +451,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_STANDARD_COLS_KEY, JSON.stringify(updated));
       window.dispatchEvent(new Event("jobtrace_settings_updated"));
     } catch {}
+    scheduleCloudSync({ standardColumns: updated });
   };
 
   const saveFields = (fields: CustomFieldDefinition[]) => {
@@ -333,6 +470,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_COLUMN_ORDER_KEY, JSON.stringify(nextOrder));
     } catch {}
+    scheduleCloudSync({ customFields: fields, columnOrder: nextOrder });
   };
 
   const addCustomField = (name: string, type: CustomFieldType = "text") => {
@@ -382,6 +520,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_COLUMN_ORDER_KEY, JSON.stringify(next));
     } catch {}
+    scheduleCloudSync({ columnOrder: next });
   };
 
   const moveColumn = (id: string, direction: "up" | "down") => {
@@ -396,6 +535,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_COLUMN_ORDER_KEY, JSON.stringify(next));
     } catch {}
+    scheduleCloudSync({ columnOrder: next });
   };
 
   const resetColumnOrder = () => {
@@ -407,6 +547,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.removeItem(STORAGE_COLUMN_ORDER_KEY);
     } catch {}
+    scheduleCloudSync({ columnOrder: defaultIds });
   };
 
   const updateShortcut = (action: keyof ShortcutSettings, key: string) => {
@@ -415,6 +556,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_SHORTCUTS_KEY, JSON.stringify(updated));
     } catch {}
+    scheduleCloudSync({ shortcuts: updated });
   };
 
   const resetShortcuts = () => {
@@ -422,6 +564,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.removeItem(STORAGE_SHORTCUTS_KEY);
     } catch {}
+    scheduleCloudSync({ shortcuts: DEFAULT_SHORTCUTS });
   };
 
   const addStatus = (name: string) => {
@@ -434,6 +577,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(next));
     } catch {}
+    scheduleCloudSync({ statuses: next });
   };
 
   const removeStatus = (name: string) => {
@@ -443,6 +587,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(next));
     } catch {}
+    scheduleCloudSync({ statuses: next });
   };
 
   const moveStatus = (name: string, direction: "up" | "down") => {
@@ -457,6 +602,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(next));
     } catch {}
+    scheduleCloudSync({ statuses: next });
   };
 
   const reorderStatuses = (sourceName: string, targetName: string, side: "above" | "below" = "above") => {
@@ -473,6 +619,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(next));
     } catch {}
+    scheduleCloudSync({ statuses: next });
   };
 
   const resetStatuses = () => {
@@ -480,6 +627,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.removeItem(STORAGE_STATUSES_KEY);
     } catch {}
+    scheduleCloudSync({ statuses: DEFAULT_STATUSES });
   };
 
   // Backwards compatibility helper
@@ -542,6 +690,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(STORAGE_EXTENSION_SETTINGS_KEY, JSON.stringify(payload.extensionSettings));
       }
     } catch {}
+
+    scheduleCloudSync({
+      showRowNumbers: payload.showRowNumbers,
+      standardColumns: payload.standardColumns,
+      statuses: payload.statuses,
+      customFields: payload.customFields,
+      shortcuts: payload.shortcuts,
+      columnOrder: nextOrder,
+      extensionSettings: payload.extensionSettings || extensionSettings,
+    });
   };
 
   const updateExtensionSettings = (partial: Partial<ExtensionSettings>) => {
@@ -566,6 +724,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(STORAGE_EXTENSION_SETTINGS_KEY, JSON.stringify(next));
         window.dispatchEvent(new Event("jobtrace_settings_updated"));
       } catch {}
+      scheduleCloudSync({ extensionSettings: next });
       return next;
     });
   };
@@ -605,6 +764,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         extensionSettings,
         updateExtensionSettings,
         applySettings,
+        cloudSyncStatus,
+        syncToCloud,
       }}
     >
       {children}

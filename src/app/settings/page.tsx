@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import { useAuth } from "@/context/AuthContext";
 import {
   useSettings,
   STANDARD_COLUMN_NAMES,
@@ -22,6 +23,7 @@ type SettingsSection =
   | "shortcuts";
 
 export default function SettingsPage() {
+  const { user } = useAuth();
   const {
     theme,
     setTheme,
@@ -42,6 +44,8 @@ export default function SettingsPage() {
     resetShortcuts,
     extensionSettings,
     updateExtensionSettings,
+    cloudSyncStatus,
+    syncToCloud,
   } = useSettings();
 
   const [activeSection, setActiveSection] = useState<SettingsSection>("extension");
@@ -147,13 +151,55 @@ export default function SettingsPage() {
 
       <main className="p-4 sm:p-8 max-w-5xl mx-auto w-full flex-1">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f0f6fc]">
-            Settings
-          </h1>
-          <p className="text-xs text-[#8b949e] mt-0.5">
-            Manage extension scraping, appearance, columns, and preferences
-          </p>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f0f6fc]">
+              Settings
+            </h1>
+            <p className="text-xs text-[#8b949e] mt-0.5">
+              Manage extension scraping, appearance, columns, and preferences
+            </p>
+          </div>
+
+          {/* Cloud Sync Status */}
+          <div className="flex items-center gap-2">
+            {user ? (
+              <div
+                className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs border border-[#30363d] bg-[#161b22] text-[#8b949e]"
+                title={`All preferences synced with ${user.email}`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    cloudSyncStatus === "syncing"
+                      ? "bg-amber-400 animate-pulse"
+                      : "bg-emerald-400"
+                  }`}
+                />
+                <span className="text-[11px] text-[#c9d1d9] font-medium">
+                  {cloudSyncStatus === "syncing" ? "Syncing..." : "Cloud synced"}
+                </span>
+                <span className="text-[10px] text-[#8b949e] hidden sm:inline max-w-[160px] truncate">
+                  ({user.email})
+                </span>
+              </div>
+            ) : (
+              <div
+                className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs border border-[#30363d] bg-[#161b22] text-[#8b949e]"
+                title="Sign in to sync your preferences across devices"
+              >
+                <span className="w-2 h-2 rounded-full bg-[#8b949e]/60" />
+                <span className="text-[11px] text-[#8b949e]">
+                  Local only
+                </span>
+                <Link
+                  href="/login"
+                  className="text-[11px] text-[#58a6ff] hover:underline ml-1"
+                >
+                  Sign in to sync
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Layout: Sidebar + Settings Cards */}
