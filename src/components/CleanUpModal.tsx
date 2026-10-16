@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import type { JobApplication } from "@/types/job";
+import ConfirmModal from "@/components/ConfirmModal";
 
 interface CleanUpModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export default function CleanUpModal({
   const [selectedCount, setSelectedCount] = useState<number>(25);
   const [isCustomCount, setIsCustomCount] = useState<boolean>(false);
   const [customCountInput, setCustomCountInput] = useState<string>("");
+  const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
 
   const matchingJobs = useMemo(() => {
     const now = Date.now();
@@ -66,26 +68,14 @@ export default function CleanUpModal({
 
   if (!isOpen) return null;
 
-  function handleConfirmDelete() {
-    if (matchingJobs.length === 0) return;
-    const count = matchingJobs.length;
-    const isAll = cleanupType === "all";
-    if (
-      !confirm(
-        isAll
-          ? `Are you sure you want to permanently delete ALL ${count} application${count > 1 ? "s" : ""}? This cannot be undone.`
-          : `Are you sure you want to permanently delete ${count} application${count > 1 ? "s" : ""}? This cannot be undone.`
-      )
-    ) {
-      return;
-    }
-
+  function executeDelete() {
     const idsToDelete = matchingJobs.map((j) => j.id);
     if (onDeleteJobs) {
       onDeleteJobs(idsToDelete);
     } else {
       idsToDelete.forEach((id) => onDeleteJob(id));
     }
+    setIsConfirmOpen(false);
     onClose();
   }
 
@@ -352,7 +342,7 @@ export default function CleanUpModal({
           <button
             type="button"
             disabled={matchingJobs.length === 0}
-            onClick={handleConfirmDelete}
+            onClick={() => setIsConfirmOpen(true)}
             className="text-xs font-medium text-white bg-[#da3633] hover:bg-[#b62324] disabled:opacity-40 disabled:hover:bg-[#da3633] px-4 py-1.5 rounded-md transition-colors cursor-pointer shadow-xs"
           >
             {cleanupType === "all"
@@ -361,6 +351,20 @@ export default function CleanUpModal({
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={executeDelete}
+        title={cleanupType === "all" ? "Delete All Applications" : "Delete Applications"}
+        message={
+          cleanupType === "all"
+            ? `Are you sure you want to permanently delete ALL ${matchingJobs.length} applications? This cannot be undone.`
+            : `Are you sure you want to permanently delete ${matchingJobs.length} application${matchingJobs.length === 1 ? "" : "s"}? This cannot be undone.`
+        }
+        confirmText={cleanupType === "all" ? "Delete All" : "Delete"}
+        isDestructive={true}
+      />
     </div>
   );
 }

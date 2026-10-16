@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent, KeyboardEvent } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { useSettings } from "@/context/SettingsContext";
 import DatePicker from "@/components/DatePicker";
+import ConfirmModal from "@/components/ConfirmModal";
 import { getEffectiveJobId, formatDateDisplay, findDuplicateJob, formatDuplicateMessage } from "@/lib/jobId";
 
 interface EditJobModalProps {
@@ -33,6 +34,7 @@ export default function EditJobModal({
   const [url, setUrl] = useState("");
   const [notes, setNotes] = useState("");
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!job || !isOpen) return;
@@ -106,10 +108,14 @@ export default function EditJobModal({
 
   function handleDelete() {
     if (!job) return;
-    if (confirm(`Delete application for ${job.company} (${job.role})?`)) {
-      onDelete(job.id);
-      onClose();
-    }
+    setIsDeleteConfirmOpen(true);
+  }
+
+  function executeDelete() {
+    if (!job) return;
+    onDelete(job.id);
+    setIsDeleteConfirmOpen(false);
+    onClose();
   }
 
   return (
@@ -329,6 +335,16 @@ export default function EditJobModal({
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={executeDelete}
+        title="Delete Application"
+        message={job ? `Are you sure you want to permanently delete the application for ${job.company} (${job.role})? This cannot be undone.` : ""}
+        confirmText="Delete"
+        isDestructive={true}
+      />
     </div>
   );
 }

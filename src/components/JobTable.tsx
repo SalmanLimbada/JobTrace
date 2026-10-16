@@ -8,6 +8,7 @@ import CSVImportModal from "@/components/CSVImportModal";
 import EditJobModal from "@/components/EditJobModal";
 import ExportCSVModal from "@/components/ExportCSVModal";
 import CleanUpModal from "@/components/CleanUpModal";
+import ConfirmModal from "@/components/ConfirmModal";
 import SimpleRequirementsDrawer from "@/components/SimpleRequirementsDrawer";
 import { getEffectiveJobId } from "@/lib/jobId";
 import {
@@ -55,20 +56,20 @@ function getFieldValue(job: JobApplication, fieldId: string): string | undefined
 function getStatusBadgeStyle(status: string): string {
   switch (status.toLowerCase()) {
     case "applied":
-      return "bg-[#58a6ff]/15 text-[#58a6ff] border-[#58a6ff]/35 hover:bg-[#58a6ff]/25";
+      return "status-badge-applied bg-[#58a6ff]/15 text-[#58a6ff] border-[#58a6ff]/35 hover:bg-[#58a6ff]/25";
     case "interview":
     case "oa / assessment":
     case "phone screen":
     case "technical screen":
     case "behavioral":
-      return "bg-[#d29922]/15 text-[#d29922] border-[#d29922]/35 hover:bg-[#d29922]/25";
+      return "status-badge-interview bg-[#d29922]/15 text-[#d29922] border-[#d29922]/35 hover:bg-[#d29922]/25";
     case "offer":
-      return "bg-[#3fb950]/15 text-[#3fb950] border-[#3fb950]/35 hover:bg-[#3fb950]/25";
+      return "status-badge-offer bg-[#3fb950]/15 text-[#3fb950] border-[#3fb950]/35 hover:bg-[#3fb950]/25";
     case "rejected":
     case "withdrawn":
-      return "bg-[#f85149]/15 text-[#f85149] border-[#f85149]/35 hover:bg-[#f85149]/25";
+      return "status-badge-rejected bg-[#f85149]/15 text-[#f85149] border-[#f85149]/35 hover:bg-[#f85149]/25";
     default:
-      return "bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-500";
+      return "status-badge-other bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-500";
   }
 }
 
@@ -76,7 +77,7 @@ function getRowStatusStyle(status: string): { borderClass: string; dimClass: str
   switch (status.toLowerCase()) {
     case "offer":
       return {
-        borderClass: "border-l-2 border-l-[#3fb950]",
+        borderClass: "border-l-2 border-l-[#3fb950] row-border-offer",
         dimClass: "hover:bg-[#3fb950]/5",
       };
     case "interview":
@@ -85,18 +86,18 @@ function getRowStatusStyle(status: string): { borderClass: string; dimClass: str
     case "technical screen":
     case "behavioral":
       return {
-        borderClass: "border-l-2 border-l-[#d29922]",
+        borderClass: "border-l-2 border-l-[#d29922] row-border-interview",
         dimClass: "hover:bg-[#d29922]/5",
       };
     case "applied":
       return {
-        borderClass: "border-l-2 border-l-[#58a6ff]",
+        borderClass: "border-l-2 border-l-[#58a6ff] row-border-applied",
         dimClass: "hover:bg-[#58a6ff]/5",
       };
     case "rejected":
     case "withdrawn":
       return {
-        borderClass: "border-l-2 border-l-[#f85149]/40",
+        borderClass: "border-l-2 border-l-[#f85149]/40 row-border-rejected",
         dimClass: "opacity-65 hover:opacity-100",
       };
     default:
@@ -135,6 +136,7 @@ export default function JobTable({
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isCleanUpModalOpen, setIsCleanUpModalOpen] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState<JobApplication | null>(null);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [sortColumn, setSortColumn] = useState<string>("appliedDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -468,7 +470,7 @@ export default function JobTable({
             <select
               value={job.status}
               onChange={(e) => onStatusChange(job.id, e.target.value as ApplicationStatus)}
-              className={`text-xs font-medium px-2.5 py-1 rounded-full border outline-none cursor-pointer transition-all duration-150 ${badgeStyle}`}
+              className={`status-badge-select text-xs font-medium px-2.5 py-1 rounded-full border outline-none cursor-pointer transition-all duration-150 ${badgeStyle}`}
             >
               {allKnownStatuses.map((s) => (
                 <option key={s} value={s} className="bg-zinc-900 text-zinc-200">
@@ -971,9 +973,7 @@ export default function JobTable({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm(`Delete application for ${job.company} (${job.role})?`)) {
-                          onDeleteJob(job.id);
-                        }
+                        setJobToDelete(job);
                       }}
                       title="Delete application"
                       className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-zinc-500 hover:text-red-400 p-1.5 rounded hover:bg-red-500/10 cursor-pointer inline-flex items-center justify-center"
@@ -1027,6 +1027,25 @@ export default function JobTable({
         onDeleteJobs={onDeleteJobs}
         onDeleteJob={onDeleteJob}
         statuses={statuses}
+      />
+
+      <ConfirmModal
+        isOpen={!!jobToDelete}
+        onClose={() => setJobToDelete(null)}
+        onConfirm={() => {
+          if (jobToDelete) {
+            onDeleteJob(jobToDelete.id);
+            setJobToDelete(null);
+          }
+        }}
+        title="Delete Application"
+        message={
+          jobToDelete
+            ? `Are you sure you want to permanently delete the application for ${jobToDelete.company} (${jobToDelete.role})? This cannot be undone.`
+            : ""
+        }
+        confirmText="Delete"
+        isDestructive={true}
       />
     </div>
   );

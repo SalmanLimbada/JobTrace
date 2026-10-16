@@ -39,7 +39,7 @@ html[data-theme="light"] thead {
 }
 
 html[data-theme="light"] input,
-html[data-theme="light"] select,
+html[data-theme="light"] select:not(.status-badge-select),
 html[data-theme="light"] .bg-zinc-950,
 html[data-theme="light"] .bg-\[\#0d1117\] {
   background-color: #ffffff !important;
@@ -76,9 +76,12 @@ html[data-theme="light"] .hover\:bg-\[\#30363d\]:hover {
 
 html[data-theme="light"] .border-\[\#30363d\],
 html[data-theme="light"] .border-zinc-800,
-html[data-theme="light"] .border-zinc-700,
-html[data-theme="light"] tr.border-b {
+html[data-theme="light"] .border-zinc-700 {
   border-color: #d0d7de !important;
+}
+
+html[data-theme="light"] tr.border-b {
+  border-bottom-color: #d0d7de !important;
 }
 
 html[data-theme="light"] .text-\[\#f0f6fc\],
@@ -100,6 +103,109 @@ html[data-theme="light"] .text-zinc-500 {
 
 html[data-theme="light"] tr:hover {
   background-color: #f6f8fa !important;
+}
+
+/* --- Status Badges in Light Mode --- */
+html[data-theme="light"] .status-badge-applied {
+  background-color: #ddf4ff !important;
+  color: #0969da !important;
+  border-color: #54aeff !important;
+}
+html[data-theme="light"] .status-badge-applied:hover {
+  background-color: #b6e3ff !important;
+}
+
+html[data-theme="light"] .status-badge-interview {
+  background-color: #fff8c5 !important;
+  color: #9a6700 !important;
+  border-color: #d4a72c !important;
+}
+html[data-theme="light"] .status-badge-interview:hover {
+  background-color: #fae17d !important;
+}
+
+html[data-theme="light"] .status-badge-offer {
+  background-color: #dafbe1 !important;
+  color: #1a7f37 !important;
+  border-color: #4ac26b !important;
+}
+html[data-theme="light"] .status-badge-offer:hover {
+  background-color: #aceebb !important;
+}
+
+html[data-theme="light"] .status-badge-rejected {
+  background-color: #ffebe9 !important;
+  color: #cf222e !important;
+  border-color: #ff8182 !important;
+}
+html[data-theme="light"] .status-badge-rejected:hover {
+  background-color: #ffcecb !important;
+}
+
+html[data-theme="light"] .status-badge-other {
+  background-color: #f6f8fa !important;
+  color: #57606a !important;
+  border-color: #d0d7de !important;
+}
+html[data-theme="light"] .status-badge-other:hover {
+  background-color: #eaeef2 !important;
+}
+
+html[data-theme="light"] .status-badge-select option {
+  background-color: #ffffff !important;
+  color: #1f2328 !important;
+}
+
+/* --- Row Left Status Border Highlights in Light Mode --- */
+html[data-theme="light"] tr.row-border-offer {
+  border-left-color: #1a7f37 !important;
+}
+html[data-theme="light"] tr.row-border-interview {
+  border-left-color: #9a6700 !important;
+}
+html[data-theme="light"] tr.row-border-applied {
+  border-left-color: #0969da !important;
+}
+html[data-theme="light"] tr.row-border-rejected {
+  border-left-color: #cf222e !important;
+}
+
+/* --- Floating Scroll Navigation in Light Mode --- */
+html[data-theme="light"] .bg-\[\#161b22\]\/90 {
+  background-color: #ffffff !important;
+  color: #1f2328 !important;
+  border-color: #d0d7de !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+html[data-theme="light"] .bg-\[\#161b22\]\/90:hover {
+  background-color: #f6f8fa !important;
+  border-color: #8c959f !important;
+}
+html[data-theme="light"] .bg-\[\#161b22\]\/90 svg {
+  color: #57606a !important;
+}
+html[data-theme="light"] .bg-\[\#161b22\]\/90:hover svg {
+  color: #1f2328 !important;
+}
+
+/* --- Action Links & Icons in Light Mode --- */
+html[data-theme="light"] .text-blue-400 {
+  color: #0969da !important;
+}
+html[data-theme="light"] .text-blue-400:hover {
+  color: #0550ae !important;
+}
+html[data-theme="light"] .text-zinc-600 {
+  color: #8c959f !important;
+}
+
+/* --- Form Submit Button Contrast in Light Mode --- */
+html[data-theme="light"] form button[type="submit"].bg-zinc-100 {
+  background-color: #1f2328 !important;
+  color: #ffffff !important;
+}
+html[data-theme="light"] form button[type="submit"].bg-zinc-100:hover {
+  background-color: #24292f !important;
 }
 
 /* --- Filter Toggle Track & Segmented Control Light Mode --- */
