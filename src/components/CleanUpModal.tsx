@@ -20,13 +20,22 @@ export default function CleanUpModal({
   onDeleteJob,
   statuses,
 }: CleanUpModalProps) {
-  const [cleanupType, setCleanupType] = useState<"status" | "age" | "oldest">("status");
+  const [cleanupType, setCleanupType] = useState<"all" | "status" | "age" | "oldest">("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("Rejected");
   const [selectedDays, setSelectedDays] = useState<number>(90);
+  const [isCustomDays, setIsCustomDays] = useState<boolean>(false);
+  const [customDaysInput, setCustomDaysInput] = useState<string>("");
+
   const [selectedCount, setSelectedCount] = useState<number>(25);
+  const [isCustomCount, setIsCustomCount] = useState<boolean>(false);
+  const [customCountInput, setCustomCountInput] = useState<string>("");
 
   const matchingJobs = useMemo(() => {
     const now = Date.now();
+
+    if (cleanupType === "all") {
+      return [...jobs];
+    }
 
     if (cleanupType === "status") {
       return jobs.filter((j) => j.status.toLowerCase() === selectedStatus.toLowerCase());
@@ -60,9 +69,12 @@ export default function CleanUpModal({
   function handleConfirmDelete() {
     if (matchingJobs.length === 0) return;
     const count = matchingJobs.length;
+    const isAll = cleanupType === "all";
     if (
       !confirm(
-        `Are you sure you want to permanently delete ${count} application${count > 1 ? "s" : ""}? This cannot be undone.`
+        isAll
+          ? `Are you sure you want to permanently delete ALL ${count} application${count > 1 ? "s" : ""}? This cannot be undone.`
+          : `Are you sure you want to permanently delete ${count} application${count > 1 ? "s" : ""}? This cannot be undone.`
       )
     ) {
       return;
@@ -119,7 +131,18 @@ export default function CleanUpModal({
             <label className="block text-[#8b949e] text-[11px] font-medium mb-2">
               Select criteria
             </label>
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#0d1117] border border-[#30363d] rounded-lg">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-[#0d1117] border border-[#30363d] rounded-lg">
+              <button
+                type="button"
+                onClick={() => setCleanupType("all")}
+                className={`py-1.5 px-2 rounded-md font-medium transition-colors cursor-pointer text-center ${
+                  cleanupType === "all"
+                    ? "bg-[#21262d] text-[#f0f6fc] shadow-xs"
+                    : "text-[#8b949e] hover:text-[#c9d1d9]"
+                }`}
+              >
+                All
+              </button>
               <button
                 type="button"
                 onClick={() => setCleanupType("status")}
@@ -157,6 +180,17 @@ export default function CleanUpModal({
           </div>
 
           {/* Type-Specific Controls */}
+          {cleanupType === "all" && (
+            <div className="p-3.5 rounded-lg bg-red-500/10 border border-red-500/30 text-xs">
+              <span className="font-semibold block text-red-300 mb-1">
+                Delete All Applications
+              </span>
+              <span className="text-[#8b949e] leading-relaxed">
+                This will delete all <span className="font-mono text-red-200 font-bold">{jobs.length}</span> application{jobs.length === 1 ? "" : "s"} currently in your tracker.
+              </span>
+            </div>
+          )}
+
           {cleanupType === "status" && (
             <div>
               <label className="block text-[#8b949e] text-[11px] font-medium mb-1.5">
@@ -177,8 +211,8 @@ export default function CleanUpModal({
           )}
 
           {cleanupType === "age" && (
-            <div>
-              <label className="block text-[#8b949e] text-[11px] font-medium mb-1.5">
+            <div className="space-y-2.5">
+              <label className="block text-[#8b949e] text-[11px] font-medium mb-1">
                 Delete applications older than:
               </label>
               <div className="grid grid-cols-4 gap-2">
@@ -186,9 +220,13 @@ export default function CleanUpModal({
                   <button
                     key={days}
                     type="button"
-                    onClick={() => setSelectedDays(days)}
+                    onClick={() => {
+                      setSelectedDays(days);
+                      setIsCustomDays(false);
+                      setCustomDaysInput("");
+                    }}
                     className={`py-2 px-1 text-center rounded-lg border text-xs font-mono transition-colors cursor-pointer ${
-                      selectedDays === days
+                      !isCustomDays && selectedDays === days
                         ? "border-[#58a6ff] bg-[#58a6ff]/10 text-[#58a6ff] font-semibold"
                         : "border-[#30363d] bg-[#0d1117] text-[#c9d1d9] hover:bg-[#21262d]"
                     }`}
@@ -197,12 +235,42 @@ export default function CleanUpModal({
                   </button>
                 ))}
               </div>
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[#8b949e] text-[11px] whitespace-nowrap">Or custom:</span>
+                <div className="flex items-center gap-1.5 flex-1">
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 45"
+                    value={isCustomDays ? customDaysInput : ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomDaysInput(val);
+                      const num = parseInt(val, 10);
+                      if (!isNaN(num) && num > 0) {
+                        setSelectedDays(num);
+                        setIsCustomDays(true);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (!isCustomDays) {
+                        setIsCustomDays(true);
+                        if (!customDaysInput) setCustomDaysInput(String(selectedDays));
+                      }
+                    }}
+                    className={`w-24 bg-[#0d1117] border ${
+                      isCustomDays ? "border-[#58a6ff]" : "border-[#30363d]"
+                    } text-[#f0f6fc] text-xs rounded-lg px-2.5 py-1.5 outline-none font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                  />
+                  <span className="text-[#8b949e] text-xs">days</span>
+                </div>
+              </div>
             </div>
           )}
 
           {cleanupType === "oldest" && (
-            <div>
-              <label className="block text-[#8b949e] text-[11px] font-medium mb-1.5">
+            <div className="space-y-2.5">
+              <label className="block text-[#8b949e] text-[11px] font-medium mb-1">
                 Delete the oldest:
               </label>
               <div className="grid grid-cols-4 gap-2">
@@ -210,9 +278,13 @@ export default function CleanUpModal({
                   <button
                     key={cnt}
                     type="button"
-                    onClick={() => setSelectedCount(cnt)}
+                    onClick={() => {
+                      setSelectedCount(cnt);
+                      setIsCustomCount(false);
+                      setCustomCountInput("");
+                    }}
                     className={`py-2 px-1 text-center rounded-lg border text-xs font-mono transition-colors cursor-pointer ${
-                      selectedCount === cnt
+                      !isCustomCount && selectedCount === cnt
                         ? "border-[#58a6ff] bg-[#58a6ff]/10 text-[#58a6ff] font-semibold"
                         : "border-[#30363d] bg-[#0d1117] text-[#c9d1d9] hover:bg-[#21262d]"
                     }`}
@@ -220,6 +292,37 @@ export default function CleanUpModal({
                     {cnt} jobs
                   </button>
                 ))}
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[#8b949e] text-[11px] whitespace-nowrap">Or custom:</span>
+                <div className="flex items-center gap-1.5 flex-1">
+                  <input
+                    type="number"
+                    min="1"
+                    max={jobs.length}
+                    placeholder="e.g. 15"
+                    value={isCustomCount ? customCountInput : ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomCountInput(val);
+                      const num = parseInt(val, 10);
+                      if (!isNaN(num) && num > 0) {
+                        setSelectedCount(num);
+                        setIsCustomCount(true);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (!isCustomCount) {
+                        setIsCustomCount(true);
+                        if (!customCountInput) setCustomCountInput(String(selectedCount));
+                      }
+                    }}
+                    className={`w-24 bg-[#0d1117] border ${
+                      isCustomCount ? "border-[#58a6ff]" : "border-[#30363d]"
+                    } text-[#f0f6fc] text-xs rounded-lg px-2.5 py-1.5 outline-none font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                  />
+                  <span className="text-[#8b949e] text-xs">jobs</span>
+                </div>
               </div>
             </div>
           )}
@@ -252,7 +355,9 @@ export default function CleanUpModal({
             onClick={handleConfirmDelete}
             className="text-xs font-medium text-white bg-[#da3633] hover:bg-[#b62324] disabled:opacity-40 disabled:hover:bg-[#da3633] px-4 py-1.5 rounded-md transition-colors cursor-pointer shadow-xs"
           >
-            Delete {matchingJobs.length > 0 ? matchingJobs.length : ""} Application{matchingJobs.length === 1 ? "" : "s"}
+            {cleanupType === "all"
+              ? `Delete All (${matchingJobs.length}) Applications`
+              : `Delete ${matchingJobs.length > 0 ? matchingJobs.length : ""} Application${matchingJobs.length === 1 ? "" : "s"}`}
           </button>
         </div>
       </div>
