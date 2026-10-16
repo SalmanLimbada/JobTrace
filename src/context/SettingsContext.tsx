@@ -7,10 +7,13 @@ import { supabase } from "@/lib/supabase";
 
 export type AppTheme = "dark" | "light";
 
+export type FilterStyle = "pills" | "dropdown";
+
 export type CloudSyncStatus = "synced" | "syncing" | "local";
 
 export interface CloudSettingsPayload {
   theme: AppTheme;
+  filterStyle?: FilterStyle;
   customFields: CustomFieldDefinition[];
   standardColumns: StandardColumnsSettings;
   showRowNumbers: boolean;
@@ -132,6 +135,8 @@ interface SettingsContextType {
   showRowNumbers: boolean;
   setShowRowNumbers: (show: boolean) => void;
   toggleShowRowNumbers: () => void;
+  filterStyle: FilterStyle;
+  setFilterStyle: (style: FilterStyle) => void;
   customFields: CustomFieldDefinition[];
   addCustomField: (name: string, type?: CustomFieldType) => void;
   removeCustomField: (id: string) => void;
@@ -170,6 +175,7 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 const STORAGE_THEME_KEY = "jobtrace_theme";
+const STORAGE_FILTER_STYLE_KEY = "jobtrace_filter_style";
 const STORAGE_FIELDS_KEY = "jobtrace_custom_fields_v2";
 const STORAGE_STANDARD_COLS_KEY = "jobtrace_standard_columns";
 const STORAGE_ROW_NUMBERS_KEY = "jobtrace_row_numbers";
@@ -184,6 +190,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [theme, setThemeState] = useState<AppTheme>("dark");
+  const [filterStyle, setFilterStyleState] = useState<FilterStyle>("pills");
   const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(DEFAULT_FIELDS);
   const [standardColumns, setStandardColumns] = useState<StandardColumnsSettings>(DEFAULT_STANDARD_COLUMNS);
   const [showRowNumbers, setShowRowNumbersState] = useState<boolean>(true);
@@ -195,6 +202,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const latestSettingsRef = useRef<CloudSettingsPayload>({
     theme,
+    filterStyle,
     customFields,
     standardColumns,
     showRowNumbers,
@@ -207,6 +215,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     latestSettingsRef.current = {
       theme,
+      filterStyle,
       customFields,
       standardColumns,
       showRowNumbers,
@@ -215,7 +224,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       statuses,
       extensionSettings,
     };
-  }, [theme, customFields, standardColumns, showRowNumbers, columnOrder, shortcuts, statuses, extensionSettings]);
+  }, [theme, filterStyle, customFields, standardColumns, showRowNumbers, columnOrder, shortcuts, statuses, extensionSettings]);
 
   const syncToCloud = useCallback(async (customSnapshot?: Partial<CloudSettingsPayload>) => {
     if (!user) {
@@ -269,6 +278,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         document.documentElement.setAttribute("data-theme", cloudData.theme);
         try { localStorage.setItem(STORAGE_THEME_KEY, cloudData.theme); } catch {}
       }
+      if (cloudData.filterStyle === "pills" || cloudData.filterStyle === "dropdown") {
+        setFilterStyleState(cloudData.filterStyle);
+        try { localStorage.setItem(STORAGE_FILTER_STYLE_KEY, cloudData.filterStyle); } catch {}
+      }
       if (Array.isArray(cloudData.customFields)) {
         setCustomFields(cloudData.customFields);
         try { localStorage.setItem(STORAGE_FIELDS_KEY, JSON.stringify(cloudData.customFields)); } catch {}
@@ -307,6 +320,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
+      // Filter Style
+      const savedFilterStyle = localStorage.getItem(STORAGE_FILTER_STYLE_KEY);
+      if (savedFilterStyle === "pills" || savedFilterStyle === "dropdown") {
+        setFilterStyleState(savedFilterStyle);
+      }
       // Extension Settings
       const savedExt = localStorage.getItem(STORAGE_EXTENSION_SETTINGS_KEY);
       if (savedExt) {
@@ -439,6 +457,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const toggleShowRowNumbers = () => {
     setShowRowNumbers(!showRowNumbers);
+  };
+
+  const setFilterStyle = (style: FilterStyle) => {
+    setFilterStyleState(style);
+    try {
+      localStorage.setItem(STORAGE_FILTER_STYLE_KEY, style);
+      window.dispatchEvent(new Event("jobtrace_settings_updated"));
+    } catch {}
+    scheduleCloudSync({ filterStyle: style });
   };
 
   const toggleStandardColumn = (key: keyof StandardColumnsSettings) => {
@@ -740,6 +767,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         showRowNumbers,
         setShowRowNumbers,
         toggleShowRowNumbers,
+        filterStyle,
+        setFilterStyle,
         customFields,
         addCustomField,
         removeCustomField,

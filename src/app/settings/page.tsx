@@ -25,10 +25,10 @@ type SettingsSection =
 export default function SettingsPage() {
   const { user } = useAuth();
   const {
-    theme,
-    setTheme,
     showRowNumbers,
     setShowRowNumbers,
+    filterStyle,
+    setFilterStyle,
     standardColumns,
     toggleStandardColumn,
     customFields,
@@ -38,7 +38,7 @@ export default function SettingsPage() {
     statuses,
     addStatus,
     removeStatus,
-    moveStatus,
+    reorderStatuses,
     shortcuts,
     updateShortcut,
     resetShortcuts,
@@ -49,6 +49,11 @@ export default function SettingsPage() {
   } = useSettings();
 
   const [activeSection, setActiveSection] = useState<SettingsSection>("extension");
+
+  // Drag and drop state for pipeline statuses
+  const [draggedStatus, setDraggedStatus] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
+  const [dragOverSide, setDragOverSide] = useState<"above" | "below">("above");
 
   // Local state for adding items
   const [newFieldName, setNewFieldName] = useState("");
@@ -149,7 +154,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] flex flex-col font-sans">
       <Navbar />
 
-      <main className="p-3.5 sm:p-8 max-w-5xl mx-auto w-full flex-1">
+      <main className="p-3.5 sm:p-8 max-w-7xl mx-auto w-full flex-1">
         {/* Header */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -376,50 +381,52 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* 2. APPEARANCE SECTION */}
+            {/* 2. DISPLAY & FILTERS SECTION */}
             {activeSection === "display" && (
               <div className="border border-[#30363d] bg-[#161b22] rounded-lg overflow-hidden divide-y divide-[#30363d]">
                 <div className="px-5 py-4">
-                  <h2 className="text-sm font-semibold text-[#f0f6fc]">Appearance</h2>
+                  <h2 className="text-sm font-semibold text-[#f0f6fc]">Display & Filters</h2>
                   <p className="text-xs text-[#8b949e] mt-0.5">
-                    Manage themes and general visual preferences.
+                    Customize your table layout, filter format, and line numbering.
                   </p>
                 </div>
 
-                <div className="p-5 flex items-center justify-between gap-4">
+                {/* Status Filter Style */}
+                <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <span className="text-xs font-medium text-[#f0f6fc] block">Interface Theme</span>
+                    <span className="text-xs font-medium text-[#f0f6fc] block">Status Filter Style</span>
                     <span className="text-xs text-[#8b949e]">
-                      Switch between dark workspace and high-contrast light mode.
+                      Choose between segmented pill buttons and a clean dropdown menu in the toolbar.
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 p-0.5 bg-[#0d1117] border border-[#30363d] rounded-md">
+                  <div className="flex items-center gap-1.5 p-0.5 bg-[#0d1117] border border-[#30363d] rounded-md shrink-0">
                     <button
                       type="button"
-                      onClick={() => setTheme("dark")}
+                      onClick={() => setFilterStyle("pills")}
                       className={`px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
-                        theme === "dark"
-                          ? "bg-[#21262d] text-[#f0f6fc]"
+                        filterStyle === "pills"
+                          ? "bg-[#21262d] text-[#f0f6fc] font-semibold"
                           : "text-[#8b949e] hover:text-[#c9d1d9]"
                       }`}
                     >
-                      Dark
+                      Segmented Pills
                     </button>
                     <button
                       type="button"
-                      onClick={() => setTheme("light")}
+                      onClick={() => setFilterStyle("dropdown")}
                       className={`px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
-                        theme === "light"
-                          ? "bg-[#21262d] text-[#f0f6fc]"
+                        filterStyle === "dropdown"
+                          ? "bg-[#21262d] text-[#f0f6fc] font-semibold"
                           : "text-[#8b949e] hover:text-[#c9d1d9]"
                       }`}
                     >
-                      Light
+                      Simple Dropdown
                     </button>
                   </div>
                 </div>
 
+                {/* Row Numbers Toggle */}
                 <div className="p-5 flex items-center justify-between gap-4">
                   <div>
                     <span className="text-xs font-medium text-[#f0f6fc] block">Row Numbers</span>
@@ -580,45 +587,89 @@ export default function SettingsPage() {
 
                   {statusError && <p className="text-xs text-[#f85149]">{statusError}</p>}
 
-                  {/* List of Statuses */}
+                  {/* List of Statuses with 6-dots Drag Handle */}
                   <div className="space-y-1.5 pt-1">
-                    {statuses.map((statusName, idx) => (
-                      <div
-                        key={statusName}
-                        className="flex items-center justify-between p-2.5 rounded-md border border-[#30363d] bg-[#0d1117]"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-xs font-mono text-[#8b949e] w-4">{idx + 1}</span>
-                          <span className="text-xs font-medium text-[#f0f6fc]">{statusName}</span>
-                        </div>
+                    {statuses.map((statusName, idx) => {
+                      const isDragged = draggedStatus === statusName;
+                      const isOver = dragOverStatus === statusName && !isDragged;
 
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => moveStatus(statusName, "up")}
-                            disabled={idx === 0}
-                            className="px-2 py-0.5 text-xs text-[#8b949e] hover:text-white disabled:opacity-20 cursor-pointer"
-                          >
-                            ▲
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveStatus(statusName, "down")}
-                            disabled={idx === statuses.length - 1}
-                            className="px-2 py-0.5 text-xs text-[#8b949e] hover:text-white disabled:opacity-20 cursor-pointer"
-                          >
-                            ▼
-                          </button>
+                      return (
+                        <div
+                          key={statusName}
+                          draggable={true}
+                          onDragStart={(e) => {
+                            setDraggedStatus(statusName);
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", statusName);
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                            if (draggedStatus && draggedStatus !== statusName) {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const midpoint = rect.top + rect.height / 2;
+                              const side = e.clientY < midpoint ? "above" : "below";
+                              setDragOverStatus(statusName);
+                              setDragOverSide(side);
+                            }
+                          }}
+                          onDragLeave={(e) => {
+                            if (e.currentTarget === e.target) {
+                              setDragOverStatus(null);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const source = draggedStatus || e.dataTransfer.getData("text/plain");
+                            if (source && source !== statusName) {
+                              reorderStatuses(source, statusName, dragOverSide);
+                            }
+                            setDraggedStatus(null);
+                            setDragOverStatus(null);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedStatus(null);
+                            setDragOverStatus(null);
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-md border bg-[#0d1117] transition-all duration-150 relative ${
+                            isDragged
+                              ? "opacity-30 border-dashed border-[#58a6ff]"
+                              : isOver && dragOverSide === "above"
+                              ? "border-[#30363d] border-t-2 border-t-[#58a6ff]"
+                              : isOver && dragOverSide === "below"
+                              ? "border-[#30363d] border-b-2 border-b-[#58a6ff]"
+                              : "border-[#30363d]"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {/* 6-dots drag handle */}
+                            <div
+                              className="text-[#8b949e] hover:text-[#c9d1d9] cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-[#21262d] transition-colors"
+                              title="Drag to reorder"
+                            >
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                                <circle cx="9" cy="6" r="1.5" />
+                                <circle cx="15" cy="6" r="1.5" />
+                                <circle cx="9" cy="12" r="1.5" />
+                                <circle cx="15" cy="12" r="1.5" />
+                                <circle cx="9" cy="18" r="1.5" />
+                                <circle cx="15" cy="18" r="1.5" />
+                              </svg>
+                            </div>
+                            <span className="text-xs font-mono text-[#8b949e] w-4">{idx + 1}</span>
+                            <span className="text-xs font-medium text-[#f0f6fc]">{statusName}</span>
+                          </div>
+
                           <button
                             type="button"
                             onClick={() => removeStatus(statusName)}
-                            className="text-xs text-[#8b949e] hover:text-[#f85149] px-2 py-0.5 rounded transition-colors cursor-pointer"
+                            className="text-xs text-[#8b949e] hover:text-[#f85149] px-2 py-1 rounded transition-colors cursor-pointer"
                           >
                             Delete
                           </button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>

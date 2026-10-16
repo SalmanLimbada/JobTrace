@@ -3,6 +3,7 @@
 import { useEffect, useState, FormEvent, KeyboardEvent } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { useSettings } from "@/context/SettingsContext";
+import DatePicker from "@/components/DatePicker";
 
 interface EditJobModalProps {
   job: JobApplication | null;
@@ -188,11 +189,11 @@ export default function EditJobModal({
               <label className="block text-[#8b949e] text-[11px] font-medium mb-1.5">
                 Date Applied
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={appliedDate}
-                onChange={(e) => setAppliedDate(e.target.value)}
-                className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors"
+                onChange={setAppliedDate}
+                title="Date Applied"
+                className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors font-mono h-[34px]"
               />
             </div>
           </div>
@@ -204,20 +205,33 @@ export default function EditJobModal({
                 Custom Fields
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {activeCustomFields.map((field) => (
-                  <div key={field.id}>
-                    <label className="block text-[#8b949e] text-[11px] font-medium mb-1.5">
-                      {field.name}
-                    </label>
-                    <input
-                      type={field.type === "date" ? "date" : field.type === "number" ? "number" : "text"}
-                      value={customValues[field.id] || ""}
-                      onChange={(e) => handleCustomChange(field.id, e.target.value)}
-                      placeholder={field.name}
-                      className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors"
-                    />
-                  </div>
-                ))}
+                {activeCustomFields.map((field) => {
+                  const isDate = field.type === "date";
+                  return (
+                    <div key={field.id}>
+                      <label className="block text-[#8b949e] text-[11px] font-medium mb-1.5">
+                        {field.name}
+                      </label>
+                      {isDate ? (
+                        <DatePicker
+                          value={customValues[field.id] || ""}
+                          onChange={(val) => handleCustomChange(field.id, val)}
+                          title={field.name}
+                          placeholder={field.name}
+                          className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors font-mono h-[34px]"
+                        />
+                      ) : (
+                        <input
+                          type={field.type === "number" ? "number" : "text"}
+                          value={customValues[field.id] || ""}
+                          onChange={(e) => handleCustomChange(field.id, e.target.value)}
+                          placeholder={field.name}
+                          className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

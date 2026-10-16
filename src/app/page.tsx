@@ -434,7 +434,7 @@ export default function Home() {
     <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] flex flex-col">
       <Navbar jobs={jobList} onMigrateStatus={handleMigrateStatus} />
 
-      <main className="p-3 sm:p-8 max-w-5xl mx-auto w-full flex-1">
+      <main className="p-3 sm:p-8 max-w-7xl mx-auto w-full flex-1">
         {/* Guest Mode Banner */}
         {!user && !isAuthLoading && (
           <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-4 rounded-lg border border-[#30363d] bg-[#161b22] px-3.5 sm:px-4 py-2.5 text-xs text-[#8b949e]">

@@ -271,9 +271,67 @@ function scrapePageDetails() {
     }
   }
 
-  // Requirements extraction fallback
-  if (result.keyRequirements.length === 0) {
-    const headings = Array.from(document.querySelectorAll("h2, h3, h4, strong, p"));
+  // Enhanced High-Signal Key Extraction: Tech Stack, Languages, YoE, Constraints
+  try {
+    const extractedKeyItems = [];
+    const bodyText = document.body.innerText || "";
+    const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, strong, p, b"));
+
+    // 1. Specific sections: Tech Stack, Languages, Technologies
+    const techHeader = headings.find(h => {
+      const txt = h.textContent.toLowerCase();
+      return (
+        txt.includes("tech stack") ||
+        txt.includes("technologies") ||
+        txt.includes("tools & technologies") ||
+        txt.includes("programming language") ||
+        txt.includes("our stack")
+      );
+    });
+
+    if (techHeader) {
+      let el = techHeader.nextElementSibling;
+      while (el && el.tagName !== "UL" && el.tagName !== "OL" && el.tagName !== "P" && !el.querySelector("ul, ol")) {
+        el = el.nextElementSibling;
+      }
+      if (el) {
+        const list = el.tagName === "UL" || el.tagName === "OL" ? el : el.querySelector("ul, ol");
+        if (list) {
+          Array.from(list.querySelectorAll("li")).forEach(li => {
+            const t = li.textContent.trim();
+            if (t.length > 3 && t.length < 200) extractedKeyItems.push(`[Tech] ${t}`);
+          });
+        } else if (el.tagName === "P" && el.textContent.trim().length > 10) {
+          extractedKeyItems.push(`[Tech] ${el.textContent.trim().slice(0, 150)}`);
+        }
+      }
+    }
+
+    // 2. Years of Experience (YoE) detection
+    const yoeRegex = /(?:^|[.\n•-])\s*([^\n.•-]{0,60}?\b(?:\d+[\+]?\s*(?:to\s*\d+\s*)?(?:years?|yrs?)(?:\s+of)?(?:\s+hands-on)?\s+(?:professional\s+)?experience[^\n.•-]{0,100}))/gi;
+    let yoeMatch;
+    let yoeCount = 0;
+    while ((yoeMatch = yoeRegex.exec(bodyText)) !== null && yoeCount < 2) {
+      const clean = yoeMatch[1].replace(/^[•\s*-]+/, "").trim();
+      if (clean.length > 15 && clean.length < 180 && !extractedKeyItems.some(i => i.includes(clean))) {
+        extractedKeyItems.push(`[YoE] ${clean}`);
+        yoeCount++;
+      }
+    }
+
+    // 3. Constraints & Eligibility (Clearance, Citizenship, Sponsorship, Remote/Hybrid)
+    const constraintRegex = /(?:^|[.\n•-])\s*([^\n.•-]{0,40}?\b(?:security clearance|secret clearance|top secret|u\.?s\.?\s+citizen(?:ship)?|authorized to work|work authorization|visa sponsorship|no sponsorship|hybrid|on-site|remote within)[^\n.•-]{0,100})/gi;
+    let conMatch;
+    let conCount = 0;
+    while ((conMatch = constraintRegex.exec(bodyText)) !== null && conCount < 2) {
+      const clean = conMatch[1].replace(/^[•\s*-]+/, "").trim();
+      if (clean.length > 12 && clean.length < 160 && !extractedKeyItems.some(i => i.includes(clean))) {
+        extractedKeyItems.push(`[Constraint] ${clean}`);
+        conCount++;
+      }
+    }
+
+    // 4. Requirements & Qualifications bullets fallback/fill
     const reqHeader = headings.find(h => {
       const txt = h.textContent.toLowerCase();
       return (
@@ -295,13 +353,25 @@ function scrapePageDetails() {
       if (list) {
         const items = Array.from(list.querySelectorAll("li"))
           .map(li => li.textContent.trim())
-          .filter(t => t.length > 10 && t.length < 250);
-        if (items.length > 0) {
-          result.keyRequirements = items.slice(0, 8);
-        }
+          .filter(t => t.length > 12 && t.length < 250);
+
+        items.forEach(item => {
+          if (extractedKeyItems.length < 8 && !extractedKeyItems.some(i => i.includes(item.slice(0, 30)))) {
+            // Categorize if contains tech keywords vs general requirement
+            if (/\b(python|javascript|typescript|react|node|java|c\+\+|golang|go|rust|aws|gcp|azure|sql|nosql|docker|kubernetes|graphql|rest|api|linux)\b/i.test(item)) {
+              extractedKeyItems.push(`[Tech] ${item}`);
+            } else {
+              extractedKeyItems.push(item);
+            }
+          }
+        });
       }
     }
-  }
+
+    if (extractedKeyItems.length > 0) {
+      result.keyRequirements = extractedKeyItems.slice(0, 8);
+    }
+  } catch (e) {}
 
     return result;
   } catch (err) {

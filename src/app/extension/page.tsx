@@ -8,7 +8,7 @@ export default function ExtensionPage() {
     <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] flex flex-col font-sans">
       <Navbar />
 
-      <main className="p-3.5 sm:p-8 max-w-5xl mx-auto w-full flex-1 space-y-5 sm:space-y-6">
+      <main className="p-3.5 sm:p-8 max-w-7xl mx-auto w-full flex-1 space-y-5 sm:space-y-6">
         {/* Header - Consistent with Tracker and Settings */}
         <div className="mb-6">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f0f6fc]">

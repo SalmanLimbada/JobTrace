@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { ApplicationStatus } from "@/types/job";
 import { useSettings } from "@/context/SettingsContext";
+import DatePicker from "@/components/DatePicker";
 
 export interface NewJobPayload {
   company: string;
@@ -141,14 +142,14 @@ export default function JobForm({ onAddJob }: JobFormProps) {
         );
       case "appliedDate":
         return (
-          <input
-            key="appliedDate"
-            type="date"
-            title="Date Applied"
-            value={appliedDate}
-            onChange={(e) => setAppliedDate(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors font-mono"
-          />
+          <div key="appliedDate" className="w-full">
+            <DatePicker
+              value={appliedDate}
+              onChange={setAppliedDate}
+              title="Date Applied"
+              className="bg-zinc-950 border border-zinc-800 text-xs rounded-lg px-3 py-2 outline-none focus:border-zinc-500 font-mono h-[38px]"
+            />
+          </div>
         );
       case "url":
         return (
@@ -176,10 +177,24 @@ export default function JobForm({ onAddJob }: JobFormProps) {
       default: {
         const customField = activeCustomMap.get(colId);
         if (!customField) return null;
+        const isDate = customField.type === "date";
+        if (isDate) {
+          return (
+            <div key={colId} className="w-full">
+              <DatePicker
+                value={fieldValues[colId] || ""}
+                onChange={(val) => handleFieldValueChange(colId, val)}
+                placeholder={`${customField.name} (optional)`}
+                title={customField.name}
+                className="bg-zinc-950 border border-zinc-800 text-xs rounded-lg px-3 py-2 outline-none focus:border-zinc-500 font-mono h-[38px]"
+              />
+            </div>
+          );
+        }
         return (
           <input
             key={colId}
-            type={customField.type === "date" ? "date" : customField.type === "number" ? "number" : "text"}
+            type={customField.type === "number" ? "number" : "text"}
             placeholder={`${customField.name} (optional)`}
             value={fieldValues[colId] || ""}
             onChange={(e) => handleFieldValueChange(colId, e.target.value)}

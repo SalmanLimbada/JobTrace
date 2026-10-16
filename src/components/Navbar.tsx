@@ -58,7 +58,7 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
   return (
     <>
       <header className="border-b border-[#30363d] bg-[#161b22] sticky top-0 z-40">
-        <div className="max-w-5xl mx-auto px-2.5 sm:px-8 h-14 flex items-center justify-between gap-1.5 sm:gap-3">
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-8 h-14 flex items-center justify-between gap-1.5 sm:gap-3">
           {/* Left: Brand Logo & Title */}
           <div className="flex items-center gap-2 sm:gap-6 shrink-0">
             <Link

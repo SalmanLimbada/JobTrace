@@ -121,6 +121,7 @@ export default function JobTable({
     statuses,
     shortcuts,
     extensionSettings,
+    filterStyle,
   } = useSettings();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -311,7 +312,7 @@ export default function JobTable({
     return counts;
   }, [allKnownStatuses, jobs]);
 
-  const MAX_VISIBLE = 4;
+  const MAX_VISIBLE = 8;
   const topStatuses = useMemo(() => {
     return statuses.slice(0, MAX_VISIBLE);
   }, [statuses]);
@@ -408,15 +409,15 @@ export default function JobTable({
     switch (colId) {
       case "company":
         return (
-          <td key={colId} className="p-2.5 sm:p-3 font-medium text-zinc-100 whitespace-nowrap">
+          <td key={colId} className="p-2.5 sm:p-3 font-medium text-zinc-100 max-w-[200px] break-words">
             {job.company}
           </td>
         );
       case "role":
         return (
-          <td key={colId} className="p-2.5 sm:p-3 text-zinc-300 whitespace-nowrap">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-zinc-100">{job.role}</span>
+          <td key={colId} className="p-2.5 sm:p-3 text-zinc-300 min-w-[180px] max-w-[380px]">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-zinc-100 break-words">{job.role}</span>
               {extensionSettings?.extractRequirements &&
                 extensionSettings?.requirementsDisplay === "drawer" &&
                 job.keyRequirements &&
@@ -475,7 +476,7 @@ export default function JobTable({
       case "appliedDate":
         return (
           <td key={colId} className="p-2.5 sm:p-3 text-zinc-400 text-xs font-mono whitespace-nowrap">
-            {job.appliedDate}
+            {job.appliedDate || <span className="text-zinc-600">—</span>}
           </td>
         );
       case "url": {
@@ -503,12 +504,12 @@ export default function JobTable({
         return (
           <td
             key={colId}
-            className={`p-2.5 sm:p-3 text-xs whitespace-nowrap ${
+            className={`p-2.5 sm:p-3 text-xs ${
               colId === "notes"
                 ? "text-zinc-400 max-w-xs truncate"
                 : customField?.type === "date"
-                ? "text-zinc-400 font-mono"
-                : "text-zinc-300"
+                ? "text-zinc-400 font-mono whitespace-nowrap"
+                : "text-zinc-300 break-words"
             }`}
             title={colId === "notes" ? val : undefined}
           >
@@ -605,164 +606,191 @@ export default function JobTable({
           </div>
         </div>
 
-        {/* Segmented Status Pill Bar with iOS Sliding Frosted Glass Thumb */}
-        <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 -mx-1 px-1 sm:mx-0 sm:px-0">
-          <div
-            ref={pillTrackRef}
-            className="filter-toggle-track relative inline-flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-1 max-w-full shadow-inner gap-0.5 shrink-0"
-          >
-          {/* iOS-Style Sliding Frosted Glass Thumb */}
-          <div
-            className="filter-slider-thumb absolute top-1 bottom-1 rounded-md bg-white/15 backdrop-blur-md border border-white/20 shadow-sm transition-all duration-200 ease-out pointer-events-none"
-            style={{
-              left: `${thumbStyle.left}px`,
-              width: `${thumbStyle.width}px`,
-              opacity: thumbStyle.opacity,
-            }}
-          />
-
-          {/* "All" button */}
-          <button
-            type="button"
-            data-active={filterStatus === "All" ? "true" : "false"}
-            onClick={() => setFilterStatus("All")}
-            className={`relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
-              filterStatus === "All"
-                ? "text-[#f0f6fc] font-semibold"
-                : "text-[#8b949e] hover:text-[#c9d1d9]"
-            }`}
-          >
-            <span>All</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] leading-tight transition-colors ${
-                filterStatus === "All"
-                  ? "bg-[#30363d] text-[#f0f6fc] font-semibold active-filter-badge"
-                  : "bg-[#161b22] text-[#8b949e] inactive-filter-badge"
-              }`}
+        {/* Filter Controls: Dropdown or Segmented Pill Bar */}
+        {filterStyle === "dropdown" ? (
+          <div className="w-full md:w-auto flex items-center">
+            <div className="relative w-full md:w-auto">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full md:w-auto bg-[#0d1117] border border-[#30363d] hover:border-[#58a6ff] text-[#f0f6fc] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors cursor-pointer pr-8 font-medium shadow-inner appearance-none"
+              >
+                <option value="All" className="bg-[#161b22] text-[#f0f6fc]">
+                  All Applications ({statusCounts["All"] || 0})
+                </option>
+                {allKnownStatuses.map((s) => (
+                  <option key={s} value={s} className="bg-[#161b22] text-[#f0f6fc]">
+                    {s} ({statusCounts[s] || 0})
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[#8b949e]">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Segmented Status Pill Bar with iOS Sliding Frosted Glass Thumb */
+          <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 -mx-1 px-1 sm:mx-0 sm:px-0">
+            <div
+              ref={pillTrackRef}
+              className="filter-toggle-track relative inline-flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-1 max-w-full shadow-inner gap-0.5 shrink-0"
             >
-              {statusCounts["All"] || 0}
-            </span>
-          </button>
+              {/* iOS-Style Sliding Frosted Glass Thumb */}
+              <div
+                className="filter-slider-thumb absolute top-1 bottom-1 rounded-md bg-white/15 backdrop-blur-md border border-white/20 shadow-sm transition-all duration-200 ease-out pointer-events-none"
+                style={{
+                  left: `${thumbStyle.left}px`,
+                  width: `${thumbStyle.width}px`,
+                  opacity: thumbStyle.opacity,
+                }}
+              />
 
-          {/* Top 4 visible statuses */}
-          {topStatuses.map((s) => {
-            const isSelected = filterStatus === s;
-            const count = statusCounts[s] || 0;
-
-            return (
+              {/* "All" button */}
               <button
-                key={s}
                 type="button"
-                data-active={isSelected ? "true" : "false"}
-                onClick={() => setFilterStatus(s)}
+                data-active={filterStatus === "All" ? "true" : "false"}
+                onClick={() => setFilterStatus("All")}
                 className={`relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
-                  isSelected
+                  filterStatus === "All"
                     ? "text-[#f0f6fc] font-semibold"
                     : "text-[#8b949e] hover:text-[#c9d1d9]"
                 }`}
               >
-                <span>{s}</span>
+                <span>All</span>
                 <span
                   className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] leading-tight transition-colors ${
-                    isSelected
+                    filterStatus === "All"
                       ? "bg-[#30363d] text-[#f0f6fc] font-semibold active-filter-badge"
                       : "bg-[#161b22] text-[#8b949e] inactive-filter-badge"
                   }`}
                 >
-                  {count}
+                  {statusCounts["All"] || 0}
                 </span>
               </button>
-            );
-          })}
 
-          {/* "More ▾" Overflow Dropdown */}
-          {overflowStatuses.length > 0 && (
-            <div className="relative z-10" ref={moreRef}>
-              <button
-                type="button"
-                data-active={isOverflowSelected ? "true" : "false"}
-                onClick={() => setIsMoreOpen(!isMoreOpen)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
-                  isOverflowSelected
-                    ? "text-[#58a6ff] font-semibold"
-                    : "text-[#8b949e] hover:text-[#c9d1d9]"
-                }`}
-                title="More status filters"
-              >
-                <span>
-                  {isOverflowSelected ? filterStatus : "More"}
-                </span>
-                <span
-                  className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] leading-tight transition-colors ${
-                    isOverflowSelected
-                      ? "bg-[#58a6ff]/20 text-[#58a6ff]"
-                      : "bg-[#161b22] text-[#8b949e]"
-                  }`}
-                >
-                  {isOverflowSelected
-                    ? statusCounts[filterStatus] || 0
-                    : overflowStatuses.reduce(
-                        (acc, s) => acc + (statusCounts[s] || 0),
-                        0
-                      )}
-                </span>
-                <svg
-                  className={`w-3 h-3 transition-transform duration-150 ${
-                    isMoreOpen ? "rotate-180" : ""
-                  }`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+              {/* Top 4 visible statuses */}
+              {topStatuses.map((s) => {
+                const isSelected = filterStatus === s;
+                const count = statusCounts[s] || 0;
 
-              {/* Popover Dropdown Menu */}
-              {isMoreOpen && (
-                <div className="absolute right-0 top-full mt-1.5 z-40 min-w-[170px] bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl p-1 animate-in fade-in zoom-in-95 duration-100">
-                  <div className="px-2 py-1 text-[10px] uppercase font-semibold text-[#8b949e] tracking-wider border-b border-[#30363d]/60 mb-1">
-                    Other Statuses
-                  </div>
-                  <div className="space-y-0.5 max-h-56 overflow-y-auto">
-                    {overflowStatuses.map((s) => {
-                      const isSelected = filterStatus === s;
-                      const count = statusCounts[s] || 0;
-                      return (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => {
-                            setFilterStatus(s);
-                            setIsMoreOpen(false);
-                          }}
-                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer ${
-                            isSelected
-                              ? "bg-[#21262d] text-[#58a6ff] font-medium"
-                              : "text-[#c9d1d9] hover:bg-[#21262d]/70 hover:text-white"
-                          }`}
-                        >
-                          <span className="truncate mr-2">{s}</span>
-                          <span
-                            className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full ${
-                              isSelected
-                                ? "bg-[#58a6ff]/20 text-[#58a6ff]"
-                                : "bg-[#0d1117] text-[#8b949e]"
-                            }`}
-                          >
-                            {count}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    data-active={isSelected ? "true" : "false"}
+                    onClick={() => setFilterStatus(s)}
+                    className={`relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                      isSelected
+                        ? "text-[#f0f6fc] font-semibold"
+                        : "text-[#8b949e] hover:text-[#c9d1d9]"
+                    }`}
+                  >
+                    <span>{s}</span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] leading-tight transition-colors ${
+                        isSelected
+                          ? "bg-[#30363d] text-[#f0f6fc] font-semibold active-filter-badge"
+                          : "bg-[#161b22] text-[#8b949e] inactive-filter-badge"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {/* "More ▾" Overflow Dropdown */}
+              {overflowStatuses.length > 0 && (
+                <div className="relative z-10" ref={moreRef}>
+                  <button
+                    type="button"
+                    data-active={isOverflowSelected ? "true" : "false"}
+                    onClick={() => setIsMoreOpen(!isMoreOpen)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                      isOverflowSelected
+                        ? "text-[#58a6ff] font-semibold"
+                        : "text-[#8b949e] hover:text-[#c9d1d9]"
+                    }`}
+                    title="More status filters"
+                  >
+                    <span>
+                      {isOverflowSelected ? filterStatus : "More"}
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] leading-tight transition-colors ${
+                        isOverflowSelected
+                          ? "bg-[#58a6ff]/20 text-[#58a6ff]"
+                          : "bg-[#161b22] text-[#8b949e]"
+                      }`}
+                    >
+                      {isOverflowSelected
+                        ? statusCounts[filterStatus] || 0
+                        : overflowStatuses.reduce(
+                            (acc, s) => acc + (statusCounts[s] || 0),
+                            0
+                          )}
+                    </span>
+                    <svg
+                      className={`w-3 h-3 transition-transform duration-150 ${
+                        isMoreOpen ? "rotate-180" : ""
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Popover Dropdown Menu */}
+                  {isMoreOpen && (
+                    <div className="absolute right-0 top-full mt-1.5 z-40 min-w-[170px] bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl p-1 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-2 py-1 text-[10px] uppercase font-semibold text-[#8b949e] tracking-wider border-b border-[#30363d]/60 mb-1">
+                        Other Statuses
+                      </div>
+                      <div className="space-y-0.5 max-h-56 overflow-y-auto">
+                        {overflowStatuses.map((s) => {
+                          const isSelected = filterStatus === s;
+                          const count = statusCounts[s] || 0;
+                          return (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => {
+                                setFilterStatus(s);
+                                setIsMoreOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer ${
+                                isSelected
+                                  ? "bg-[#21262d] text-[#58a6ff] font-medium"
+                                  : "text-[#c9d1d9] hover:bg-[#21262d]/70 hover:text-white"
+                              }`}
+                            >
+                              <span className="truncate mr-2">{s}</span>
+                              <span
+                                className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full ${
+                                  isSelected
+                                    ? "bg-[#58a6ff]/20 text-[#58a6ff]"
+                                    : "bg-[#0d1117] text-[#8b949e]"
+                                }`}
+                              >
+                                {count}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Table Container */}
