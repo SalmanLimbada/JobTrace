@@ -149,13 +149,6 @@ export default function EditJobModal({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
-          {/* Already Applied Proof Banner */}
-          <div className="p-2.5 rounded-lg bg-[#58a6ff]/10 border border-[#58a6ff]/30 text-xs flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#58a6ff]"></span>
-            <span className="text-[#f0f6fc] font-medium">This was already applied to</span>
-            <span className="text-[#8b949e] font-mono">[{formatDateDisplay(job.appliedDate)}]</span>
-          </div>
-
           {duplicateJob && (
             <div className="p-3 rounded-lg bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs flex items-start gap-2">
               <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

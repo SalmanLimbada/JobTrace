@@ -1,52 +1,78 @@
 # JobTrace
 
-An active job tracker built because spreadsheets get messy when you're applying to hundreds of jobs. 
+A web application and companion browser extension for tracking job applications. Designed as a faster, more organized alternative to spreadsheets when managing high volumes of applications.
 
-Works immediately in your browser without signing up (saves locally), or you can create an account to sync across devices via Supabase. Includes a companion Chrome extension to save postings with one click from LinkedIn or Indeed.
+Live site: [https://job-trace-web.vercel.app/](https://job-trace-web.vercel.app/)
 
-**Live site:** [https://job-trace-web.vercel.app/](https://job-trace-web.vercel.app/) (no signup required)
+## Features
 
-## What it does
+- **Duplicate Detection**: Identifies whether you have already applied to a job using posting IDs, canonical URLs, and company/role matching.
+- **Companion Chrome Extension**: Clip job details from job boards or post-application confirmation pages directly into your tracker. Field visibility and custom fields can be configured from extension settings.
+- **Customizable Pipeline**: Add, rename, and reorder application stages (e.g. Applied, Online Assessment, Interview, Offer, Rejected) to match your workflow.
+- **Configurable Columns and Fields**: Toggle standard columns, reorder table headers, and create custom fields for salary, notes, deadlines, and other details.
+- **Bulk Actions**: Select and remove multiple applications at once.
+- **Data Portability**: Import and export applications via CSV.
+- **Storage and Sync**: Supports local browser storage as well as cloud synchronization through Supabase.
 
-- **Track applications**: Keep tabs on company, role, date applied, link, and status (Applied, Interview, Offer, Rejected).
-- **Guest mode**: Start adding jobs right away without creating an account. Saves to your browser's local storage.
-- **Account sync**: Sign in with email to back up jobs to Supabase (PostgreSQL). Guest jobs migrate automatically when you log in.
-- **Chrome extension**: Click the extension icon on any job posting to auto-fill the title/URL and save it straight to your tracker.
-- **CSV import & export**: Backup your data or import hundreds of jobs from an existing spreadsheet.
+## Tech Stack
 
-## Tech stack
-
-- Next.js + React
-- TypeScript + Tailwind CSS
-- Supabase (PostgreSQL + Auth)
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Supabase (PostgreSQL)
 - Chrome Extension (Manifest V3)
-- Hosted on Vercel
 
-## Running locally
+## Chrome Extension Installation
+
+1. Open Chrome and navigate to `chrome://extensions/`.
+2. Enable **Developer mode** in the top-right corner.
+3. Click **Load unpacked** and select the `extension/` directory from this repository (or unzip `public/jobtrace-extension.zip`).
+4. Pin the extension to your toolbar to capture job postings and confirmation pages while browsing.
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm, pnpm, or yarn
+
+### Installation
+
+1. Clone the repository:
 
 ```bash
 git clone https://github.com/SalmanLimbada/job-application-tracker.git
 cd job-application-tracker
-pnpm install
 ```
 
-Create a `.env.local` file with your Supabase credentials:
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Set up environment variables:
+
+Create a `.env.local` file in the root directory:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-Run the dev server:
+4. Database Setup:
+
+If using your own Supabase project, execute `supabase/schema.sql` in the Supabase SQL Editor to initialize the database schema and security policies.
+
+5. Run the development server:
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
-Run the schema in `supabase/schema.sql` inside your Supabase SQL editor if you're setting up a fresh database.
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-## Loading the Chrome extension
+## License
 
-1. Go to `chrome://extensions` in Chrome.
-2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and choose the `extension/` folder in this repo.
+MIT
