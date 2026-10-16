@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent, KeyboardEvent } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { useSettings } from "@/context/SettingsContext";
 import DatePicker from "@/components/DatePicker";
+import { getEffectiveJobId, formatDateDisplay, findDuplicateJob, formatDuplicateMessage } from "@/lib/jobId";
 
 interface EditJobModalProps {
   job: JobApplication | null;
@@ -11,6 +12,7 @@ interface EditJobModalProps {
   onClose: () => void;
   onSave: (id: string, updated: Partial<JobApplication>) => void;
   onDelete: (id: string) => void;
+  existingJobs?: JobApplication[];
 }
 
 export default function EditJobModal({
@@ -19,6 +21,7 @@ export default function EditJobModal({
   onClose,
   onSave,
   onDelete,
+  existingJobs,
 }: EditJobModalProps) {
   const { customFields, statuses } = useSettings();
   const activeCustomFields = customFields.filter((f) => f.enabled && f.id !== "notes");
@@ -45,8 +48,16 @@ export default function EditJobModal({
     if (job.salary && !custom.salary) custom.salary = job.salary;
     if (job.location && !custom.location) custom.location = job.location;
     if (job.deadlineDate && !custom.deadlineDate) custom.deadlineDate = job.deadlineDate;
+    if (job.jobId && !custom.jobId) custom.jobId = job.jobId;
+    else if (!custom.jobId) {
+      const extracted = getEffectiveJobId(job);
+      if (extracted) custom.jobId = extracted;
+    }
     setCustomValues(custom);
   }, [job, isOpen]);
+
+  const effectiveJobId = job ? getEffectiveJobId(job) : null;
+  const duplicateJob = job && existingJobs ? findDuplicateJob(job, existingJobs, job.id) : null;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -73,6 +84,7 @@ export default function EditJobModal({
       appliedDate,
       url: url.trim() || "#",
       notes: notes.trim(),
+      jobId: customValues["jobId"]?.trim() || effectiveJobId || undefined,
       salary: customValues["salary"]?.trim() || undefined,
       location: customValues["location"]?.trim() || undefined,
       deadlineDate: customValues["deadlineDate"]?.trim() || undefined,
@@ -137,6 +149,25 @@ export default function EditJobModal({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
+          {/* Already Applied Proof Banner */}
+          <div className="p-2.5 rounded-lg bg-[#58a6ff]/10 border border-[#58a6ff]/30 text-xs flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#58a6ff]"></span>
+            <span className="text-[#f0f6fc] font-medium">This was already applied to</span>
+            <span className="text-[#8b949e] font-mono">[{formatDateDisplay(job.appliedDate)}]</span>
+          </div>
+
+          {duplicateJob && (
+            <div className="p-3 rounded-lg bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs flex items-start gap-2">
+              <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <span className="font-semibold block text-amber-300">Duplicate Application Found</span>
+                <span>You also applied to this job on [{formatDateDisplay(duplicateJob.appliedDate)}]</span>
+              </div>
+            </div>
+          )}
+
           {/* Company & Role */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -246,7 +277,7 @@ export default function EditJobModal({
                 type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://linkedin.com/jobs/..."
+                placeholder="https://..."
                 className="flex-1 bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors font-mono"
               />
               {url.trim() && (

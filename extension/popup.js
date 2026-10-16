@@ -10,7 +10,8 @@ let currentUserId = null;
 // Extractor function executed in context of the active tab
 function scrapePageDetails() {
   try {
-    const JUNK_COMPANY_REGEX = /^(careers?|jobs?|apply|job search|search|welcome|candidate home|portal|dashboard|search jobs|current openings|join us|work with us|job opportunities|opportunities|workday|logo|company logo|myworkdayjobs|home|back|sign in|login)$/i;
+    const JUNK_COMPANY_REGEX = /^(careers?|jobs?|apply|job search|search|welcome|candidate home|portal|dashboard|search jobs|current openings|join us|work with us|job opportunities|opportunities|workday|logo|company logo|myworkdayjobs|home|back|sign in|login|thank you|confirmation)$/i;
+    const JUNK_ROLE_REGEX = /^(thank you|thanks|application (?:submitted|received|status|confirmation)|applied|congratulations|success|candidate (?:home|portal|profile)|careers?|home|sign in|login|welcome|dashboard|confirm(?:ation)?)$/i;
 
     function isValidCompany(name) {
       if (!name || typeof name !== "string") return false;
@@ -19,12 +20,33 @@ function scrapePageDetails() {
       return !JUNK_COMPANY_REGEX.test(t);
     }
 
+    function isValidRole(title) {
+      if (!title || typeof title !== "string") return false;
+      const t = title.trim();
+      if (t.length < 2 || t.length > 100) return false;
+      return !JUNK_ROLE_REGEX.test(t);
+    }
+
+    let initialUrl = window.location.href;
+    // If on a post-application submission or confirmation page, check if document.referrer points to the actual job posting
+    try {
+      if (document.referrer && (document.referrer.startsWith("http://") || document.referrer.startsWith("https://"))) {
+        const curPath = window.location.pathname.toLowerCase();
+        const isConfirm = /submitted|confirmation|thank|thanks|applied|complete|success/i.test(curPath) ||
+          /thank you for applying|application (?:has been )?submitted/i.test(document.title);
+        if (isConfirm && !/submitted|confirmation|thank|thanks|applied|complete/i.test(document.referrer)) {
+          initialUrl = document.referrer;
+        }
+      }
+    } catch (e) {}
+
     const result = {
       company: "",
       role: "",
-      url: window.location.href,
+      url: initialUrl,
       location: "",
       salary: "",
+      jobId: "",
       notes: "",
       keyRequirements: []
     };
@@ -40,6 +62,11 @@ function scrapePageDetails() {
 
         if (json && (json["@type"] === "JobPosting" || json.title || json.hiringOrganization)) {
           if (json.title && !result.role) result.role = json.title;
+          if (json.identifier) {
+            const idVal = typeof json.identifier === "string" ? json.identifier : (json.identifier.value || json.identifier.name);
+            if (idVal && !result.jobId) result.jobId = String(idVal).trim();
+          }
+          if (!result.jobId && json.jobPostingId) result.jobId = String(json.jobPostingId).trim();
           if (json.hiringOrganization) {
             const org = typeof json.hiringOrganization === "string" ? json.hiringOrganization : json.hiringOrganization.name;
             if (org && isValidCompany(org) && !result.company) result.company = org.trim();
@@ -181,22 +208,49 @@ function scrapePageDetails() {
     }
   }
 
+  // 2.5 Post-application / confirmation page text parsing
+  // E.g. "Thank you for applying to the Software Engineer position at Acme Corp"
+  // or "Your application for Senior Frontend Developer has been submitted"
+  try {
+    const confirmationRoleEl = document.querySelector('[data-automation-id="jobPostingTitle"], [data-automation-id="compositeHeaderSubTitle"], [data-automation-id="jobTitle"], .gwt-Label.job-title, [data-qa="job-title"]');
+    if (confirmationRoleEl) {
+      const cRole = confirmationRoleEl.textContent.trim();
+      if (isValidRole(cRole) && !result.role) result.role = cRole;
+    }
+
+    const pageText = document.body.innerText || "";
+    if (!result.role || !result.company) {
+      const matchAppliedAt = pageText.match(/(?:applied to|application for)(?:\s+the)?\s+([A-Za-z0-9\s/.,#-]{3,60}?)(?:\s+(?:position|role))?\s+at\s+([A-Za-z0-9\s&.,'-]{2,50})/i);
+      if (matchAppliedAt) {
+        if (!result.role && isValidRole(matchAppliedAt[1])) result.role = matchAppliedAt[1].trim();
+        if (!result.company && isValidCompany(matchAppliedAt[2])) result.company = matchAppliedAt[2].trim();
+      }
+    }
+
+    if (!result.role) {
+      const matchForRole = pageText.match(/application for(?:\s+the)?\s+([A-Za-z0-9\s/.,#-]{3,60}?)\s+(?:has been|is)/i);
+      if (matchForRole && isValidRole(matchForRole[1])) {
+        result.role = matchForRole[1].trim();
+      }
+    }
+  } catch (e) {}
+
   // 3. Generic DOM fallbacks
   if (!result.role) {
     const h1 = document.querySelector("h1");
-    if (h1 && h1.textContent.trim().length > 2 && h1.textContent.trim().length < 120) {
+    if (h1 && isValidRole(h1.textContent)) {
       result.role = h1.textContent.trim();
     } else {
       let t = document.title || "";
       t = t.replace(/\s*[-–|•]\s*(LinkedIn|Indeed|Glassdoor|Greenhouse|Lever|Ashby|Workday|Jobs).*$/i, "");
       const parts = t.split(/\s*[-–|]\s*/);
       if (parts.length >= 2) {
-        result.role = parts[0].trim();
+        if (isValidRole(parts[0])) result.role = parts[0].trim();
         if (!result.company) {
           const compCandidate = parts[1].replace(/\b(Jobs|Careers|Indeed|LinkedIn|Workday)\b/gi, "").trim();
           if (isValidCompany(compCandidate)) result.company = compCandidate;
         }
-      } else {
+      } else if (isValidRole(t)) {
         result.role = t.trim();
       }
     }
@@ -373,6 +427,23 @@ function scrapePageDetails() {
     }
   } catch (e) {}
 
+    // Extract Job / Requisition ID from DOM or URL
+    try {
+      if (!result.jobId) {
+        const wdIdEl = document.querySelector('[data-automation-id="jobPostingId"], [data-automation-id="requisitionId"], [data-testid="job-req-id"]');
+        if (wdIdEl) result.jobId = wdIdEl.textContent.trim();
+      }
+      if (!result.jobId) {
+        const bodyText = document.body?.innerText?.slice(0, 5000) || "";
+        const match = bodyText.match(/(?:Job\s*(?:Req(?:uisition)?)?\s*ID|Requisition\s*#?|Job\s*#)[:\s#]+([A-Za-z0-9_-]{4,20})/i);
+        if (match) result.jobId = match[1].trim();
+      }
+      if (!result.jobId) {
+        const reqMatch = window.location.href.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i);
+        if (reqMatch) result.jobId = reqMatch[1].toUpperCase();
+      }
+    } catch (e) {}
+
     return result;
   } catch (err) {
     return {
@@ -381,6 +452,7 @@ function scrapePageDetails() {
       url: window.location.href,
       location: "",
       salary: "",
+      jobId: "",
       notes: "",
       keyRequirements: []
     };
@@ -425,10 +497,163 @@ function renderRequirements(bullets) {
 let tableStandardColumns = null;
 let tableCustomFields = null;
 let extensionCustomFields = [];
+let cachedApplications = [];
 let isSalaryActive = true;
 let isLocationActive = true;
 let isUrlActive = true;
 let isNotesActive = true;
+let currentJobId = "";
+
+function extractJobIdFromUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return null;
+  const url = rawUrl.trim();
+  if (url === "#" || url === "" || url.toLowerCase() === "n/a") return null;
+
+  const reqMatch = url.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i);
+  if (reqMatch) return reqMatch[1].toUpperCase();
+
+  try {
+    const parsed = new URL(url.startsWith("http") ? url : "https://" + url);
+    const qParams = [
+      "jobid",
+      "job_id",
+      "reqid",
+      "req_id",
+      "requisitionid",
+      "requisition_id",
+      "gh_jid",
+      "jk",
+      "currentjobid",
+      "id",
+    ];
+    for (const [k, v] of parsed.searchParams.entries()) {
+      if (qParams.includes(k.toLowerCase()) && v && v.length >= 3) {
+        return v;
+      }
+    }
+  } catch (e) {}
+
+  const ghMatch = url.match(/\/jobs\/(\d{5,})/i);
+  if (ghMatch) return ghMatch[1];
+
+  const leverMatch = url.match(/\/jobs\/([a-f0-9-]{36})/i);
+  if (leverMatch) return leverMatch[1];
+
+  const liMatch = url.match(/\/jobs\/view\/(\d{6,})/i);
+  if (liMatch) return liMatch[1];
+
+  const wdSlugMatch = url.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/);
+  if (wdSlugMatch) return wdSlugMatch[1];
+
+  return null;
+}
+
+function cleanStr(s) {
+  return (s || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function cleanUrl(u) {
+  if (!u || u === "#") return "";
+  return u
+    .trim()
+    .replace(/^https?:\/\/(?:www\.)?/, "")
+    .split("?")[0]
+    .replace(/\/+$/, "");
+}
+
+function getEffectiveJobId(job) {
+  if (job.jobId && job.jobId.trim()) return job.jobId.trim();
+  if (job.custom_fields) {
+    if (job.custom_fields.jobId && job.custom_fields.jobId.trim()) return job.custom_fields.jobId.trim();
+    if (job.custom_fields.job_id && job.custom_fields.job_id.trim()) return job.custom_fields.job_id.trim();
+    if (job.custom_fields.requisition_id && job.custom_fields.requisition_id.trim()) return job.custom_fields.requisition_id.trim();
+  }
+  return extractJobIdFromUrl(job.url);
+}
+
+function formatDateDisplay(dateStr) {
+  if (!dateStr) return "Unknown date";
+  const clean = dateStr.split("T")[0];
+  const parts = clean.split("-");
+  if (parts.length === 3) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const mIdx = parseInt(parts[1], 10) - 1;
+    if (mIdx >= 0 && mIdx < 12) {
+      return `${months[mIdx]} ${parseInt(parts[2], 10)}, ${parts[0]}`;
+    }
+  }
+  return clean;
+}
+
+function isDuplicateJob(target, existing) {
+  const tUrl = cleanUrl(target.url);
+  const eUrl = cleanUrl(existing.url);
+  if (tUrl && eUrl && tUrl === eUrl) return true;
+
+  const tId = (target.jobId || extractJobIdFromUrl(target.url) || "").trim().toUpperCase();
+  const eId = (getEffectiveJobId(existing) || "").trim().toUpperCase();
+
+  const tComp = cleanStr(target.company);
+  const eComp = cleanStr(existing.company);
+  const tRole = cleanStr(target.role);
+  const eRole = cleanStr(existing.role);
+
+  if (tId && eId && tId === eId) {
+    const isPureDigits = /^\d+$/.test(tId);
+    if (isPureDigits) {
+      const compMatch = tComp && eComp && (tComp.includes(eComp) || eComp.includes(tComp));
+      const roleMatch = tRole && eRole && (tRole.includes(eRole) || eRole.includes(tRole));
+      if (compMatch || roleMatch) return true;
+    } else {
+      if (tComp && eComp && tComp !== eComp && !tComp.includes(eComp) && !eComp.includes(tComp)) {
+        // Different companies
+      } else {
+        return true;
+      }
+    }
+  }
+
+  if (tComp && eComp && tRole && eRole) {
+    if (tComp === eComp && tRole === eRole) return true;
+  }
+
+  return false;
+}
+
+function findDuplicateJob(target, existingList) {
+  for (const job of existingList) {
+    if (isDuplicateJob(target, job)) return job;
+  }
+  return null;
+}
+
+function checkDuplicate() {
+  const company = document.getElementById("company")?.value || "";
+  const role = document.getElementById("role")?.value || "";
+  const url = document.getElementById("url")?.value || "";
+  const jobId = currentJobId;
+
+  const duplicateBanner = document.getElementById("duplicateBanner");
+  const duplicateBannerText = document.getElementById("duplicateBannerText");
+  const saveBtn = document.getElementById("saveBtn");
+
+  if (!duplicateBanner || !duplicateBannerText) return;
+
+  const dup = findDuplicateJob({ company, role, url, jobId }, cachedApplications);
+  if (dup) {
+    const proofDate = formatDateDisplay(dup.applied_date);
+    duplicateBannerText.textContent = `This was already applied to [Applied: ${proofDate}]`;
+    duplicateBanner.style.display = "block";
+    if (saveBtn) {
+      saveBtn.textContent = "Already Applied — Save Anyway";
+    }
+  } else {
+    duplicateBanner.style.display = "none";
+    if (saveBtn && !saveBtn.disabled) {
+      saveBtn.textContent = "Save to JobTrace";
+    }
+  }
+}
 
 function escapeHtml(str) {
   if (!str) return "";
@@ -442,80 +667,211 @@ function renderCustomFields() {
 
   extensionCustomFields.forEach((field) => {
     const row = document.createElement("div");
-    row.className = "custom-field-row";
+    row.className = "form-group";
     row.innerHTML = `
-      <div class="custom-field-header">
-        <label for="custom_field_${field.id}">${escapeHtml(field.name)}</label>
-        <button type="button" class="custom-field-delete" data-id="${field.id}" title="Remove this field">×</button>
-      </div>
+      <label for="custom_field_${field.id}">${escapeHtml(field.name)}</label>
       <input type="text" class="custom-field-input" id="custom_field_${field.id}" data-id="${field.id}" data-name="${escapeHtml(field.name)}" placeholder="Enter ${escapeHtml(field.name)}..." />
     `;
-
-    const delBtn = row.querySelector(".custom-field-delete");
-    delBtn.addEventListener("click", async () => {
-      extensionCustomFields = extensionCustomFields.filter(f => f.id !== field.id);
-      await chrome.storage.local.set({ extensionCustomFields });
-      renderCustomFields();
-    });
-
     container.appendChild(row);
   });
 }
 
-function setupCustomFieldEvents() {
-  const addFieldToggleBtn = document.getElementById("addFieldToggleBtn");
-  const newFieldBox = document.getElementById("newFieldBox");
-  const newFieldNameInput = document.getElementById("newFieldNameInput");
-  const confirmAddFieldBtn = document.getElementById("confirmAddFieldBtn");
-  const cancelAddFieldBtn = document.getElementById("cancelAddFieldBtn");
+function applyFieldVisibility() {
+  const salaryGroup = document.getElementById("salaryGroup");
+  const statusSalaryRow = document.getElementById("statusSalaryRow");
+  if (salaryGroup) {
+    if (!isSalaryActive) {
+      salaryGroup.style.display = "none";
+      if (statusSalaryRow) statusSalaryRow.style.gridTemplateColumns = "1fr";
+    } else {
+      salaryGroup.style.display = "";
+      if (statusSalaryRow) statusSalaryRow.style.gridTemplateColumns = "1fr 1fr";
+    }
+  }
 
-  if (!addFieldToggleBtn || !newFieldBox) return;
+  const locationGroup = document.getElementById("locationGroup");
+  if (locationGroup) {
+    locationGroup.style.display = isLocationActive ? "" : "none";
+  }
 
-  addFieldToggleBtn.addEventListener("click", () => {
-    newFieldBox.style.display = "block";
-    addFieldToggleBtn.style.display = "none";
-    if (newFieldNameInput) {
-      newFieldNameInput.value = "";
-      newFieldNameInput.focus();
+  const urlGroup = document.getElementById("urlGroup");
+  if (urlGroup) {
+    urlGroup.style.display = isUrlActive ? "" : "none";
+  }
+
+  const reqsSection = document.getElementById("reqsSection");
+  if (reqsSection) {
+    reqsSection.style.display = extensionSettings.extractRequirements === false ? "none" : "";
+  }
+
+  const notesGroup = document.getElementById("notesGroup");
+  if (notesGroup) {
+    notesGroup.style.display = isNotesActive ? "" : "none";
+  }
+}
+
+function renderSettingsCheckboxes() {
+  const settingSalary = document.getElementById("settingSalary");
+  const settingLocation = document.getElementById("settingLocation");
+  const settingUrl = document.getElementById("settingUrl");
+  const settingReqs = document.getElementById("settingReqs");
+  const settingNotes = document.getElementById("settingNotes");
+
+  if (settingSalary) settingSalary.checked = isSalaryActive;
+  if (settingLocation) settingLocation.checked = isLocationActive;
+  if (settingUrl) settingUrl.checked = isUrlActive;
+  if (settingReqs) settingReqs.checked = extensionSettings.extractRequirements !== false;
+  if (settingNotes) settingNotes.checked = isNotesActive;
+}
+
+function renderSettingsCustomFields() {
+  const list = document.getElementById("settingsCustomFieldsList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (extensionCustomFields.length === 0) {
+    list.innerHTML = `<div style="font-size: 11px; color: #8b949e; font-style: italic; padding: 4px 0;">No custom fields yet.</div>`;
+    return;
+  }
+
+  const ul = document.createElement("div");
+  ul.style.display = "flex";
+  ul.style.flexDirection = "column";
+  ul.style.gap = "4px";
+
+  extensionCustomFields.forEach((field) => {
+    const item = document.createElement("div");
+    item.style.display = "flex";
+    item.style.alignItems = "center";
+    item.style.justifyContent = "space-between";
+    item.style.background = "#161b22";
+    item.style.border = "1px solid #30363d";
+    item.style.borderRadius = "4px";
+    item.style.padding = "4px 8px";
+    item.style.fontSize = "11px";
+
+    item.innerHTML = `
+      <span style="color: #c9d1d9; font-weight: 500;">${escapeHtml(field.name)}</span>
+      <button type="button" class="del-custom-btn" data-id="${field.id}" style="background: none; border: none; color: #8b949e; font-size: 14px; cursor: pointer; padding: 0 4px; line-height: 1;">×</button>
+    `;
+
+    item.querySelector(".del-custom-btn").addEventListener("click", async () => {
+      extensionCustomFields = extensionCustomFields.filter(f => f.id !== field.id);
+      await chrome.storage.local.set({ extensionCustomFields });
+      renderSettingsCustomFields();
+      renderCustomFields();
+    });
+
+    ul.appendChild(item);
+  });
+
+  list.appendChild(ul);
+}
+
+function showSettingsView() {
+  const jobForm = document.getElementById("jobForm");
+  const settingsView = document.getElementById("settingsView");
+  if (jobForm && settingsView) {
+    jobForm.style.display = "none";
+    settingsView.style.display = "block";
+    renderSettingsCheckboxes();
+    renderSettingsCustomFields();
+  }
+}
+
+function showFormView() {
+  const jobForm = document.getElementById("jobForm");
+  const settingsView = document.getElementById("settingsView");
+  if (jobForm && settingsView) {
+    settingsView.style.display = "none";
+    jobForm.style.display = "block";
+    applyFieldVisibility();
+    renderCustomFields();
+  }
+}
+
+async function updateCustomFieldState(fieldId, enabled) {
+  if (!tableCustomFields) tableCustomFields = [];
+  const idx = tableCustomFields.findIndex(f => f.id === fieldId);
+  if (idx >= 0) {
+    tableCustomFields[idx].enabled = enabled;
+  } else {
+    tableCustomFields.push({ id: fieldId, name: fieldId, enabled });
+  }
+  await chrome.storage.local.set({ customFields: tableCustomFields });
+}
+
+function setupSettingsEvents() {
+  const toggleBtn = document.getElementById("toggleSettingsBtn");
+  const closeBtn = document.getElementById("closeSettingsBtn");
+  const settingsView = document.getElementById("settingsView");
+
+  toggleBtn?.addEventListener("click", () => {
+    if (settingsView.style.display === "none") {
+      showSettingsView();
+    } else {
+      showFormView();
     }
   });
 
-  cancelAddFieldBtn?.addEventListener("click", () => {
-    newFieldBox.style.display = "none";
-    addFieldToggleBtn.style.display = "";
+  closeBtn?.addEventListener("click", showFormView);
+
+  document.getElementById("settingSalary")?.addEventListener("change", async (e) => {
+    isSalaryActive = e.target.checked;
+    await updateCustomFieldState("salary", isSalaryActive);
+    applyFieldVisibility();
   });
 
-  function handleConfirmAdd() {
-    const rawName = newFieldNameInput.value.trim();
+  document.getElementById("settingLocation")?.addEventListener("change", async (e) => {
+    isLocationActive = e.target.checked;
+    await updateCustomFieldState("location", isLocationActive);
+    applyFieldVisibility();
+  });
+
+  document.getElementById("settingUrl")?.addEventListener("change", async (e) => {
+    isUrlActive = e.target.checked;
+    if (!tableStandardColumns) tableStandardColumns = {};
+    tableStandardColumns.url = isUrlActive;
+    await chrome.storage.local.set({ standardColumns: tableStandardColumns });
+    applyFieldVisibility();
+  });
+
+  document.getElementById("settingReqs")?.addEventListener("change", async (e) => {
+    extensionSettings.extractRequirements = e.target.checked;
+    await chrome.storage.local.set({ extensionSettings });
+    applyFieldVisibility();
+  });
+
+  document.getElementById("settingNotes")?.addEventListener("change", async (e) => {
+    isNotesActive = e.target.checked;
+    await updateCustomFieldState("notes", isNotesActive);
+    applyFieldVisibility();
+  });
+
+  const addBtn = document.getElementById("addCustomFieldBtn");
+  const nameInput = document.getElementById("newCustomFieldNameInput");
+
+  async function handleAddCustomField() {
+    const rawName = nameInput?.value?.trim();
     if (!rawName) return;
 
     const id = rawName.toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/^_+|_+$/g, "") || `custom_${Date.now()}`;
-
     if (!extensionCustomFields.some(f => f.id === id)) {
       const newField = { id, name: rawName };
       extensionCustomFields.push(newField);
-      chrome.storage.local.set({ extensionCustomFields });
+      await chrome.storage.local.set({ extensionCustomFields });
+      nameInput.value = "";
+      renderSettingsCustomFields();
       renderCustomFields();
       syncNewFieldToOpenTabs(newField);
     }
-
-    newFieldBox.style.display = "none";
-    addFieldToggleBtn.style.display = "";
-
-    setTimeout(() => {
-      const createdInput = document.getElementById(`custom_field_${id}`);
-      if (createdInput) createdInput.focus();
-    }, 50);
   }
 
-  confirmAddFieldBtn?.addEventListener("click", handleConfirmAdd);
-  newFieldNameInput?.addEventListener("keydown", (e) => {
+  addBtn?.addEventListener("click", handleAddCustomField);
+  nameInput?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      handleConfirmAdd();
-    } else if (e.key === "Escape") {
-      newFieldBox.style.display = "none";
-      addFieldToggleBtn.style.display = "";
+      handleAddCustomField();
     }
   });
 }
@@ -636,37 +992,7 @@ async function loadSettings() {
     : true;
 
   // Toggle DOM groups and adapt row grid layout
-  const salaryGroup = document.getElementById("salaryGroup");
-  const statusSalaryRow = document.getElementById("statusSalaryRow");
-  if (salaryGroup) {
-    if (!isSalaryActive) {
-      salaryGroup.style.display = "none";
-      if (statusSalaryRow) statusSalaryRow.style.gridTemplateColumns = "1fr";
-    } else {
-      salaryGroup.style.display = "";
-      if (statusSalaryRow) statusSalaryRow.style.gridTemplateColumns = "1fr 1fr";
-    }
-  }
-
-  const locationGroup = document.getElementById("locationGroup");
-  if (locationGroup) {
-    locationGroup.style.display = isLocationActive ? "" : "none";
-  }
-
-  const urlGroup = document.getElementById("urlGroup");
-  if (urlGroup) {
-    urlGroup.style.display = isUrlActive ? "" : "none";
-  }
-
-  const reqsSection = document.getElementById("reqsSection");
-  if (reqsSection) {
-    reqsSection.style.display = extensionSettings.extractRequirements === false ? "none" : "";
-  }
-
-  const notesGroup = document.getElementById("notesGroup");
-  if (notesGroup) {
-    notesGroup.style.display = isNotesActive ? "" : "none";
-  }
+  applyFieldVisibility();
 
   // Load custom fields
   const storedFields = (await chrome.storage.local.get(["extensionCustomFields"])).extensionCustomFields || [];
@@ -683,6 +1009,30 @@ async function loadSettings() {
     });
   }
   renderCustomFields();
+
+  // Load cached applications from storage & Supabase
+  try {
+    const cached = await chrome.storage.local.get(["cachedApplications"]);
+    if (cached?.cachedApplications && Array.isArray(cached.cachedApplications)) {
+      cachedApplications = cached.cachedApplications;
+    }
+
+    let query = `${CONFIG.SUPABASE_URL}/rest/v1/applications?select=id,company,role,applied_date,url,custom_fields`;
+    if (currentUserId) query += `&user_id=eq.${currentUserId}`;
+    const res = await fetch(query, {
+      headers: {
+        "apikey": CONFIG.SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`,
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        cachedApplications = data;
+        await chrome.storage.local.set({ cachedApplications });
+      }
+    }
+  } catch (e) {}
 }
 
 // Scrape active page and populate form
@@ -728,12 +1078,15 @@ async function captureActiveTab() {
     if (salaryInput) salaryInput.value = isSalaryActive && data.salary ? data.salary : "";
     if (locationInput) locationInput.value = isLocationActive && data.location ? data.location : "";
     if (urlInput) urlInput.value = isUrlActive ? (data.url || tab.url || "") : "";
+    currentJobId = data.jobId || extractJobIdFromUrl(tab.url) || "";
 
     if (extensionSettings.extractRequirements && Array.isArray(data.keyRequirements)) {
       renderRequirements(data.keyRequirements);
     } else {
       renderRequirements([]);
     }
+
+    checkDuplicate();
 
     statusMsg.className = "status-msg";
     statusMsg.style.display = "none";
@@ -785,6 +1138,10 @@ async function submitApplication() {
     }
   });
 
+  if (currentJobId) {
+    customFieldsPayload.jobId = currentJobId;
+  }
+
   const payload = {
     id: newId,
     company: companyInput.value.trim(),
@@ -819,6 +1176,17 @@ async function submitApplication() {
       throw new Error(errTxt || "Failed to save application");
     }
 
+    // Update local cache
+    cachedApplications.push({
+      id: newId,
+      company: payload.company,
+      role: payload.role,
+      applied_date: payload.applied_date,
+      url: payload.url,
+      custom_fields: customFieldsPayload
+    });
+    chrome.storage.local.set({ cachedApplications });
+
     statusMsg.textContent = "Saved to your JobTrace dashboard!";
     statusMsg.className = "status-msg success";
     saveBtn.textContent = "Saved!";
@@ -836,7 +1204,21 @@ async function submitApplication() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  setupCustomFieldEvents();
+  setupSettingsEvents();
+
+  // Attach live duplicate check on inputs
+  ["company", "role"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("input", checkDuplicate);
+  });
+  document.getElementById("url")?.addEventListener("input", () => {
+    const urlVal = document.getElementById("url")?.value || "";
+    if (urlVal) {
+      const extracted = extractJobIdFromUrl(urlVal);
+      if (extracted) currentJobId = extracted;
+    }
+    checkDuplicate();
+  });
+
   await loadSettings();
   await captureActiveTab();
 

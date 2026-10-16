@@ -9,6 +9,7 @@ import EditJobModal from "@/components/EditJobModal";
 import ExportCSVModal from "@/components/ExportCSVModal";
 import CleanUpModal from "@/components/CleanUpModal";
 import SimpleRequirementsDrawer from "@/components/SimpleRequirementsDrawer";
+import { getEffectiveJobId } from "@/lib/jobId";
 import {
   useSettings,
   STANDARD_COLUMN_NAMES,
@@ -417,7 +418,7 @@ export default function JobTable({
             {job.company}
           </td>
         );
-      case "role":
+      case "role": {
         return (
           <td key={colId} className="p-2.5 sm:p-3 text-zinc-300 min-w-[180px] max-w-[380px]">
             <div className="flex items-center gap-2 flex-wrap">
@@ -441,6 +442,7 @@ export default function JobTable({
             </div>
           </td>
         );
+      }
       case "keyRequirements": {
         const reqs = job.keyRequirements || [];
         return (
@@ -995,6 +997,7 @@ export default function JobTable({
         onClose={() => setEditingJob(null)}
         onSave={onSaveEdit}
         onDelete={onDeleteJob}
+        existingJobs={jobs}
       />
 
       <SimpleRequirementsDrawer

@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
-import type { ApplicationStatus } from "@/types/job";
+import { useEffect, useState, useMemo } from "react";
+import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { useSettings } from "@/context/SettingsContext";
 import DatePicker from "@/components/DatePicker";
+import { extractJobIdFromUrl, findDuplicateJob, formatDuplicateMessage } from "@/lib/jobId";
 
 export interface NewJobPayload {
   company: string;
@@ -11,6 +12,7 @@ export interface NewJobPayload {
   appliedDate?: string;
   url: string;
   notes: string;
+  jobId?: string;
   salary?: string;
   location?: string;
   deadlineDate?: string;
@@ -20,9 +22,10 @@ export interface NewJobPayload {
 
 interface JobFormProps {
   onAddJob: (payload: NewJobPayload) => void;
+  existingJobs?: JobApplication[];
 }
 
-export default function JobForm({ onAddJob }: JobFormProps) {
+export default function JobForm({ onAddJob, existingJobs }: JobFormProps) {
   const { customFields, statuses, standardColumns, columnOrder } = useSettings();
 
   const [company, setCompany] = useState("");
@@ -43,6 +46,33 @@ export default function JobForm({ onAddJob }: JobFormProps) {
     setFieldValues((prev) => ({ ...prev, [id]: val }));
   }
 
+  function handleUrlChange(newUrl: string) {
+    setUrl(newUrl);
+    if (!fieldValues["jobId"]) {
+      const extracted = extractJobIdFromUrl(newUrl);
+      if (extracted) {
+        setFieldValues((prev) => ({ ...prev, jobId: extracted }));
+      }
+    }
+  }
+
+  const targetJobId = fieldValues["jobId"]?.trim() || extractJobIdFromUrl(url);
+
+  const duplicateJob = useMemo(() => {
+    if (!existingJobs || existingJobs.length === 0) return null;
+    if (!company.trim() && !role.trim() && !url.trim() && !targetJobId) return null;
+    return findDuplicateJob(
+      {
+        company,
+        role,
+        url,
+        jobId: targetJobId || undefined,
+        customFields: fieldValues,
+      },
+      existingJobs
+    );
+  }, [company, role, url, targetJobId, fieldValues, existingJobs]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!company.trim() || !role.trim()) return;
@@ -56,6 +86,7 @@ export default function JobForm({ onAddJob }: JobFormProps) {
       appliedDate: standardColumns.appliedDate ? (appliedDate || today) : today,
       url: url.trim() || "#",
       notes: notes.trim(),
+      jobId: targetJobId || undefined,
       salary: fieldValues["salary"]?.trim() || undefined,
       location: fieldValues["location"]?.trim() || undefined,
       deadlineDate: fieldValues["deadlineDate"]?.trim() || undefined,
@@ -158,8 +189,8 @@ export default function JobForm({ onAddJob }: JobFormProps) {
             type="text"
             placeholder="Posting URL"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+            onChange={(e) => handleUrlChange(e.target.value)}
+            className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors font-mono"
           />
         );
       case "notes":
@@ -210,18 +241,37 @@ export default function JobForm({ onAddJob }: JobFormProps) {
       <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2.5 sm:mb-3">
         Add New Application
       </h2>
-      <form
-        onSubmit={handleSubmit}
-        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2.5 sm:gap-3 items-center"
-      >
-        {orderedFormColIds.map((colId) => renderField(colId))}
 
-        <button
-          type="submit"
-          className="bg-zinc-100 hover:bg-white text-zinc-900 font-semibold text-xs px-4 py-2.5 rounded-lg transition-colors cursor-pointer shadow-sm hover:shadow h-[38px] flex items-center justify-center whitespace-nowrap"
-        >
-          + Add Job
-        </button>
+      {duplicateJob && (
+        <div className="mb-3.5 flex items-start gap-2.5 p-3 rounded-lg bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs">
+          <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div>
+            <span className="font-semibold block text-amber-300">
+              Already applied to this job!
+            </span>
+            <span>
+              {formatDuplicateMessage(duplicateJob, targetJobId)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
+          {orderedFormColIds.map((colId) => renderField(colId))}
+        </div>
+
+        <div className="flex items-center justify-center pt-0.5">
+          <button
+            type="submit"
+            className="w-full sm:w-auto bg-zinc-100 hover:bg-white text-zinc-900 font-semibold text-xs px-5 py-2.5 rounded-lg transition-colors cursor-pointer shadow-sm hover:shadow h-[38px] flex items-center justify-center gap-1.5 whitespace-nowrap min-w-[120px]"
+          >
+            <span className="text-sm font-bold leading-none">+</span>
+            <span>Add Job</span>
+          </button>
+        </div>
       </form>
     </section>
   );

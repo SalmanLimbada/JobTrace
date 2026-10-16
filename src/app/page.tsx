@@ -9,6 +9,7 @@ import AuthModal from "@/components/AuthModal";
 import ScrollNav from "@/components/ScrollNav";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { extractJobIdFromUrl } from "@/lib/jobId";
 
 const GUEST_STORAGE_KEY = "job_tracker_guest_jobs";
 
@@ -133,6 +134,13 @@ export default function Home() {
             }
           }
 
+          const extractedJobId =
+            row.job_id ||
+            cleanedCustomFields?.jobId ||
+            cleanedCustomFields?.job_id ||
+            extractJobIdFromUrl(row.url) ||
+            undefined;
+
           map[row.id] = {
             id: row.id,
             userId: row.user_id,
@@ -145,6 +153,7 @@ export default function Home() {
             salary: row.salary || undefined,
             location: row.location || undefined,
             deadlineDate: row.deadline_date || undefined,
+            jobId: extractedJobId,
             customFields: cleanedCustomFields,
             keyRequirements: parsedRequirements,
           };
@@ -175,6 +184,8 @@ export default function Home() {
     const newId = crypto.randomUUID();
     const appliedDate = payload.appliedDate || today;
 
+    const effectiveJobId = payload.jobId || payload.customFields?.jobId || extractJobIdFromUrl(payload.url) || undefined;
+
     const newJob: JobApplication = {
       id: newId,
       userId: user?.id,
@@ -187,6 +198,7 @@ export default function Home() {
       salary: payload.salary,
       location: payload.location,
       deadlineDate: payload.deadlineDate,
+      jobId: effectiveJobId,
       customFields: payload.customFields,
       keyRequirements: payload.keyRequirements,
     };
@@ -217,8 +229,11 @@ export default function Home() {
       if (payload.location) dbRow.location = payload.location;
       if (payload.deadlineDate) dbRow.deadline_date = payload.deadlineDate;
 
-      if (payload.customFields || payload.keyRequirements) {
+      if (effectiveJobId || payload.customFields || payload.keyRequirements) {
         const mergedCustom: Record<string, unknown> = { ...(payload.customFields || {}) };
+        if (effectiveJobId) {
+          mergedCustom.jobId = effectiveJobId;
+        }
         if (payload.keyRequirements) {
           mergedCustom._keyRequirements = JSON.stringify(payload.keyRequirements);
         }
@@ -295,11 +310,14 @@ export default function Home() {
       if (updated.location !== undefined) dbPayload.location = updated.location;
       if (updated.deadlineDate !== undefined) dbPayload.deadline_date = updated.deadlineDate;
 
-      if (updated.customFields !== undefined || updated.keyRequirements !== undefined) {
+      if (updated.jobId !== undefined || updated.customFields !== undefined || updated.keyRequirements !== undefined) {
         const mergedCustom: Record<string, unknown> = {
           ...(jobs[id]?.customFields || {}),
           ...(updated.customFields || {}),
         };
+        if (updated.jobId !== undefined) {
+          mergedCustom.jobId = updated.jobId;
+        }
         const requirementsToSave =
           updated.keyRequirements !== undefined ? updated.keyRequirements : jobs[id]?.keyRequirements;
         if (requirementsToSave) {
@@ -494,7 +512,7 @@ export default function Home() {
           rejected={rejectedCount}
         />
 
-        <JobForm onAddJob={handleAddJob} />
+        <JobForm onAddJob={handleAddJob} existingJobs={jobList} />
 
         {isLoading ? (
           <div className="p-12 text-center text-[#8b949e]">
