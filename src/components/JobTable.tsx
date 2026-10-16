@@ -500,6 +500,15 @@ export default function JobTable({
     return () => observer.disconnect();
   }, [sortedJobs.length]);
 
+  // Listen for jump-to-bottom requests from quick navigation dock
+  useEffect(() => {
+    function handleLoadAll() {
+      setVisibleCount(sortedJobs.length);
+    }
+    window.addEventListener("jobtrace_load_all_records", handleLoadAll);
+    return () => window.removeEventListener("jobtrace_load_all_records", handleLoadAll);
+  }, [sortedJobs.length]);
+
   // Sliced jobs for smooth, instant 60fps rendering without DOM bloat
   const visibleJobs = useMemo(() => {
     return sortedJobs.slice(0, visibleCount);

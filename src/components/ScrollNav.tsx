@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 
 export default function ScrollNav() {
-  const [showTop, setShowTop] = useState(false);
-  const [showBottom, setShowBottom] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const [maxScroll, setMaxScroll] = useState(0);
 
   useEffect(() => {
     let ticking = false;
@@ -12,20 +12,17 @@ export default function ScrollNav() {
     function handleScroll() {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          const scrollY = window.scrollY || document.documentElement.scrollTop;
+          const sy = window.scrollY || document.documentElement.scrollTop;
           const docHeight = Math.max(
             document.documentElement.scrollHeight,
-            document.body.scrollHeight
+            document.body.scrollHeight,
+            document.documentElement.offsetHeight
           );
           const winHeight = window.innerHeight;
-          const maxScroll = docHeight - winHeight;
+          const ms = Math.max(0, docHeight - winHeight);
 
-          // Only show 'jump to top' once scrolled down significantly
-          setShowTop(scrollY > 300);
-
-          // On desktop, show 'jump to bottom' only when there is substantial content below
-          setShowBottom(maxScroll - scrollY > 350 && maxScroll > 400);
-
+          setScrollY(sy);
+          setMaxScroll(ms);
           ticking = false;
         });
         ticking = true;
@@ -42,7 +39,11 @@ export default function ScrollNav() {
     };
   }, []);
 
-  if (!showTop && !showBottom) return null;
+  // Only show navigation when page content is scrollable
+  if (maxScroll < 120) return null;
+
+  const atTop = scrollY <= 40;
+  const atBottom = maxScroll - scrollY <= 40;
 
   const scrollToTop = () => {
     try {
@@ -52,71 +53,128 @@ export default function ScrollNav() {
     }
   };
 
-  const scrollToBottom = () => {
-    const target = Math.max(
-      document.documentElement.scrollHeight,
-      document.body.scrollHeight,
-      document.documentElement.offsetHeight
-    );
+  const stepUp = () => {
+    const step = Math.max(280, Math.round(window.innerHeight * 0.7));
     try {
-      window.scrollTo({ top: target, behavior: "smooth" });
+      window.scrollBy({ top: -step, behavior: "smooth" });
     } catch {
-      window.scrollTo(0, target);
+      window.scrollBy(0, -step);
     }
+  };
+
+  const stepDown = () => {
+    const step = Math.max(280, Math.round(window.innerHeight * 0.7));
+    try {
+      window.scrollBy({ top: step, behavior: "smooth" });
+    } catch {
+      window.scrollBy(0, step);
+    }
+  };
+
+  const scrollToBottom = () => {
+    window.dispatchEvent(new CustomEvent("jobtrace_load_all_records"));
+    setTimeout(() => {
+      const target = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight,
+        document.documentElement.offsetHeight
+      );
+      try {
+        window.scrollTo({ top: target, behavior: "smooth" });
+      } catch {
+        window.scrollTo(0, target);
+      }
+    }, 60);
   };
 
   return (
     <aside
       aria-label="Quick scroll navigation"
-      className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] right-3 sm:bottom-6 sm:right-6 z-40 flex flex-col gap-1.5"
+      className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] right-3 sm:bottom-6 sm:right-6 z-40 flex flex-col bg-[#161b22]/95 border border-[#30363d] rounded-lg shadow-2xl backdrop-blur-md overflow-hidden divide-y divide-[#30363d]/60 select-none animate-in fade-in zoom-in-95 duration-150"
     >
-      {showTop && (
-        <button
-          type="button"
-          onClick={scrollToTop}
-          title="Jump to top"
-          aria-label="Jump to top"
-          className="w-9 h-9 sm:w-8 sm:h-8 rounded-full sm:rounded-md bg-[#161b22]/95 hover:bg-[#21262d] active:bg-[#30363d] border border-[#30363d] hover:border-[#8b949e] text-[#c9d1d9] hover:text-[#f0f6fc] active:scale-95 flex items-center justify-center shadow-xl backdrop-blur-md transition-all cursor-pointer touch-manipulation select-none animate-in fade-in zoom-in-95 duration-150"
+      {/* 1. All the way to top */}
+      <button
+        type="button"
+        onClick={scrollToTop}
+        disabled={atTop}
+        title="Jump all the way to top"
+        aria-label="Jump all the way to top"
+        className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
+      >
+        <svg
+          className="w-3.5 h-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
         >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 15l7-7 7 7"
-            />
-          </svg>
-        </button>
-      )}
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 5h14" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+        </svg>
+      </button>
 
-      {showBottom && (
-        <button
-          type="button"
-          onClick={scrollToBottom}
-          title="Jump to bottom"
-          aria-label="Jump to bottom"
-          className="hidden sm:flex w-8 h-8 rounded-md bg-[#161b22]/95 hover:bg-[#21262d] active:bg-[#30363d] border border-[#30363d] hover:border-[#8b949e] text-[#c9d1d9] hover:text-[#f0f6fc] active:scale-95 items-center justify-center shadow-xl backdrop-blur-md transition-all cursor-pointer select-none animate-in fade-in zoom-in-95 duration-150"
+      {/* 2. Scroll up (little by little) */}
+      <button
+        type="button"
+        onClick={stepUp}
+        onDoubleClick={scrollToTop}
+        disabled={atTop}
+        title="Scroll up (little by little) · Double-click for top"
+        aria-label="Scroll up"
+        className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
+      >
+        <svg
+          className="w-3.5 h-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
         >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </button>
-      )}
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+        </svg>
+      </button>
+
+      {/* 3. Scroll down (little by little) */}
+      <button
+        type="button"
+        onClick={stepDown}
+        onDoubleClick={scrollToBottom}
+        disabled={atBottom}
+        title="Scroll down (little by little) · Double-click for bottom"
+        aria-label="Scroll down"
+        className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
+      >
+        <svg
+          className="w-3.5 h-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* 4. All the way to bottom */}
+      <button
+        type="button"
+        onClick={scrollToBottom}
+        disabled={atBottom}
+        title="Jump all the way to bottom"
+        aria-label="Jump all the way to bottom"
+        className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] active:bg-[#30363d] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors cursor-pointer touch-manipulation"
+      >
+        <svg
+          className="w-3.5 h-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 19h14" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
     </aside>
   );
 }
