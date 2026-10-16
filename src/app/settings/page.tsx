@@ -170,16 +170,9 @@ export default function SettingsPage() {
           <div className="flex items-center gap-2">
             {user ? (
               <div
-                className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs border border-[#30363d] bg-[#161b22] text-[#8b949e]"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border border-[#30363d] bg-[#161b22] text-[#8b949e]"
                 title={`All preferences synced with ${user.email}`}
               >
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    cloudSyncStatus === "syncing"
-                      ? "bg-amber-400 animate-pulse"
-                      : "bg-emerald-400"
-                  }`}
-                />
                 <span className="text-[11px] text-[#c9d1d9] font-medium">
                   {cloudSyncStatus === "syncing" ? "Syncing..." : "Cloud synced"}
                 </span>
@@ -189,10 +182,9 @@ export default function SettingsPage() {
               </div>
             ) : (
               <div
-                className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs border border-[#30363d] bg-[#161b22] text-[#8b949e]"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border border-[#30363d] bg-[#161b22] text-[#8b949e]"
                 title="Sign in to sync your preferences across devices"
               >
-                <span className="w-2 h-2 rounded-full bg-[#8b949e]/60" />
                 <span className="text-[11px] text-[#8b949e]">
                   Local only
                 </span>

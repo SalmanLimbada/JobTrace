@@ -187,7 +187,7 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
             </div>
 
             {isLoading ? (
-              <div className="h-7 w-12 sm:w-16 rounded-md bg-[#21262d] animate-pulse" />
+              <div className="h-7 w-12 sm:w-16 rounded-md bg-[#21262d]" />
             ) : user ? (
               <div className="relative" ref={profileRef}>
                 <button

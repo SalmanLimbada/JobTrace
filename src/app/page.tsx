@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import StatsBanner from "@/components/StatsBanner";
 import JobForm, { type NewJobPayload } from "@/components/JobForm";
@@ -18,6 +18,8 @@ export default function Home() {
   const [jobs, setJobs] = useState<Record<string, JobApplication>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const hasLoadedRef = useRef(false);
+  const prevUserIdRef = useRef<string | undefined>(undefined);
 
   // Helper to persist to localStorage in guest mode
   const saveGuestJobs = (updated: Record<string, JobApplication>) => {
@@ -29,7 +31,16 @@ export default function Home() {
   };
 
   const fetchApplications = useCallback(async () => {
-    setIsLoading(true);
+    // Detect account switch: if user id changed, reset loaded flag
+    if (prevUserIdRef.current !== user?.id) {
+      prevUserIdRef.current = user?.id;
+      hasLoadedRef.current = false;
+    }
+
+    // Only show full-screen blocking loader on the initial load
+    if (!hasLoadedRef.current) {
+      setIsLoading(true);
+    }
 
     if (!user) {
       // Guest Mode: load from localStorage
@@ -43,6 +54,7 @@ export default function Home() {
       } catch {
         setJobs({});
       }
+      hasLoadedRef.current = true;
       setIsLoading(false);
       return;
     }
@@ -51,6 +63,7 @@ export default function Home() {
     try {
       const guestData = localStorage.getItem(GUEST_STORAGE_KEY);
       if (guestData) {
+        localStorage.removeItem(GUEST_STORAGE_KEY); // Remove immediately to prevent duplicate runs
         const parsedGuest = JSON.parse(guestData) as Record<string, JobApplication>;
         const guestList = Object.values(parsedGuest);
 
@@ -76,12 +89,15 @@ export default function Home() {
             };
           });
 
-          let { error: migError } = await supabase.from("applications").insert(rowsToMigrate);
-          if (migError && migError.message?.includes("custom_fields")) {
-            const fallback = rowsToMigrate.map(({ custom_fields, ...rest }) => rest);
-            await supabase.from("applications").insert(fallback);
+          const MIGRATION_CHUNK = 500;
+          for (let i = 0; i < rowsToMigrate.length; i += MIGRATION_CHUNK) {
+            const chunk = rowsToMigrate.slice(i, i + MIGRATION_CHUNK);
+            let { error: migError } = await supabase.from("applications").insert(chunk);
+            if (migError && migError.message?.includes("custom_fields")) {
+              const fallback = chunk.map(({ custom_fields, ...rest }) => rest);
+              await supabase.from("applications").insert(fallback);
+            }
           }
-          localStorage.removeItem(GUEST_STORAGE_KEY);
         }
       }
     } catch (e) {
@@ -173,9 +189,10 @@ export default function Home() {
     } catch (err) {
       console.error("Failed to connect to database:", err);
     } finally {
+      hasLoadedRef.current = true;
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!isAuthLoading) {
@@ -378,24 +395,51 @@ export default function Home() {
     }
   }
 
-  async function handleDeleteJobs(ids: string[]) {
-    if (ids.length === 0) return;
-    const nextJobs = { ...jobs };
-    ids.forEach((id) => delete nextJobs[id]);
-    setJobs(nextJobs);
+  async function handleDeleteJobs(ids: string[], isAll?: boolean) {
+    if (ids.length === 0 && !isAll) return;
+
+    if (isAll) {
+      setJobs({});
+      if (!user) {
+        localStorage.removeItem(GUEST_STORAGE_KEY);
+        return;
+      }
+      try {
+        const { error } = await supabase
+          .from("applications")
+          .delete()
+          .eq("user_id", user.id);
+
+        if (error) {
+          console.error("Error wiping applications in database:", error.message);
+        }
+      } catch (err) {
+        console.error("Failed to wipe applications from database:", err);
+      }
+      return;
+    }
+
+    setJobs((prev) => {
+      const nextJobs = { ...prev };
+      ids.forEach((id) => delete nextJobs[id]);
+      return nextJobs;
+    });
 
     if (!user) {
+      const nextJobs = { ...jobs };
+      ids.forEach((id) => delete nextJobs[id]);
       saveGuestJobs(nextJobs);
       return;
     }
 
     try {
-      const CHUNK_SIZE = 200;
+      const CHUNK_SIZE = 40;
       for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
         const chunk = ids.slice(i, i + CHUNK_SIZE);
         const { error } = await supabase
           .from("applications")
           .delete()
+          .eq("user_id", user.id)
           .in("id", chunk);
 
         if (error) {
@@ -411,14 +455,14 @@ export default function Home() {
     const jobArray = Object.values(newJobsMap);
     if (jobArray.length === 0) return;
 
-    const nextJobs = {
-      ...jobs,
+    setJobs((prev) => ({
+      ...prev,
       ...newJobsMap,
-    };
-    setJobs(nextJobs);
+    }));
 
     if (!user) {
-      saveGuestJobs(nextJobs);
+      const merged = { ...jobs, ...newJobsMap };
+      saveGuestJobs(merged);
       return;
     }
 
@@ -499,12 +543,9 @@ export default function Home() {
         {/* Guest Mode Banner */}
         {!user && !isAuthLoading && (
           <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-4 rounded-lg border border-[#30363d] bg-[#161b22] px-3.5 sm:px-4 py-2.5 text-xs text-[#8b949e]">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[#58a6ff] shrink-0"></span>
-              <span>
-                <strong className="text-[#c9d1d9] font-medium">Guest mode:</strong> Data is saved locally in this browser.
-              </span>
-            </div>
+            <p>
+              <strong className="text-[#c9d1d9] font-medium">Guest mode:</strong> Data is saved locally in this browser.
+            </p>
             <button
               onClick={() => setIsAuthModalOpen(true)}
               className="text-[#58a6ff] hover:underline font-medium shrink-0 text-left"

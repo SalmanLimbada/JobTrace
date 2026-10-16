@@ -23,8 +23,8 @@ interface JobTableProps {
   jobs: JobApplication[];
   onStatusChange: (id: string, newStatus: ApplicationStatus) => void;
   onSaveEdit: (id: string, updated: Partial<JobApplication>) => void;
-  onDeleteJob: (id: string) => void;
-  onDeleteJobs?: (ids: string[]) => void;
+  onDeleteJob: (id: string) => Promise<void> | void;
+  onDeleteJobs?: (ids: string[], isAll?: boolean) => Promise<void> | void;
   onImportJobs: (newJobs: Record<string, JobApplication>, count: number) => void;
 }
 

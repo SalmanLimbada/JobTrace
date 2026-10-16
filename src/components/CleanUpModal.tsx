@@ -8,8 +8,8 @@ interface CleanUpModalProps {
   isOpen: boolean;
   onClose: () => void;
   jobs: JobApplication[];
-  onDeleteJobs?: (ids: string[]) => void;
-  onDeleteJob: (id: string) => void;
+  onDeleteJobs?: (ids: string[], isAll?: boolean) => Promise<void> | void;
+  onDeleteJob: (id: string) => Promise<void> | void;
   statuses: string[];
 }
 
@@ -21,7 +21,7 @@ export default function CleanUpModal({
   onDeleteJob,
   statuses,
 }: CleanUpModalProps) {
-  const [cleanupType, setCleanupType] = useState<"all" | "status" | "age" | "oldest">("all");
+  const [cleanupType, setCleanupType] = useState<"all" | "duplicates" | "status" | "age" | "oldest">("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("Rejected");
   const [selectedDays, setSelectedDays] = useState<number>(90);
   const [isCustomDays, setIsCustomDays] = useState<boolean>(false);
@@ -31,12 +31,27 @@ export default function CleanUpModal({
   const [isCustomCount, setIsCustomCount] = useState<boolean>(false);
   const [customCountInput, setCustomCountInput] = useState<string>("");
   const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const matchingJobs = useMemo(() => {
     const now = Date.now();
 
     if (cleanupType === "all") {
       return [...jobs];
+    }
+
+    if (cleanupType === "duplicates") {
+      const seen = new Set<string>();
+      const dupes: JobApplication[] = [];
+      for (const j of jobs) {
+        const key = `${(j.company || "").toLowerCase().trim()}::${(j.role || "").toLowerCase().trim()}::${(j.appliedDate || "").trim()}`;
+        if (seen.has(key)) {
+          dupes.push(j);
+        } else {
+          seen.add(key);
+        }
+      }
+      return dupes;
     }
 
     if (cleanupType === "status") {
@@ -68,15 +83,24 @@ export default function CleanUpModal({
 
   if (!isOpen) return null;
 
-  function executeDelete() {
-    const idsToDelete = matchingJobs.map((j) => j.id);
-    if (onDeleteJobs) {
-      onDeleteJobs(idsToDelete);
-    } else {
-      idsToDelete.forEach((id) => onDeleteJob(id));
+  async function executeDelete() {
+    setIsDeleting(true);
+    try {
+      const idsToDelete = matchingJobs.map((j) => j.id);
+      if (onDeleteJobs) {
+        await onDeleteJobs(idsToDelete, cleanupType === "all");
+      } else {
+        for (const id of idsToDelete) {
+          await onDeleteJob(id);
+        }
+      }
+      setIsConfirmOpen(false);
+      onClose();
+    } catch (err) {
+      console.error("Cleanup deletion failed:", err);
+    } finally {
+      setIsDeleting(false);
     }
-    setIsConfirmOpen(false);
-    onClose();
   }
 
   return (
@@ -121,7 +145,7 @@ export default function CleanUpModal({
             <label className="block text-[#8b949e] text-[11px] font-medium mb-2">
               Select criteria
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-[#0d1117] border border-[#30363d] rounded-lg">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1 bg-[#0d1117] border border-[#30363d] rounded-lg">
               <button
                 type="button"
                 onClick={() => setCleanupType("all")}
@@ -132,6 +156,17 @@ export default function CleanUpModal({
                 }`}
               >
                 All
+              </button>
+              <button
+                type="button"
+                onClick={() => setCleanupType("duplicates")}
+                className={`py-1.5 px-2 rounded-md font-medium transition-colors cursor-pointer text-center ${
+                  cleanupType === "duplicates"
+                    ? "bg-[#21262d] text-[#f0f6fc] shadow-xs"
+                    : "text-[#8b949e] hover:text-[#c9d1d9]"
+                }`}
+              >
+                Duplicates
               </button>
               <button
                 type="button"
@@ -176,8 +211,35 @@ export default function CleanUpModal({
                 Delete All Applications
               </span>
               <span className="text-[#8b949e] leading-relaxed">
-                This will delete all <span className="font-mono text-red-200 font-bold">{jobs.length}</span> application{jobs.length === 1 ? "" : "s"} currently in your tracker.
+                This will delete all <span className="font-mono text-red-200 font-bold">{jobs.length}</span> application{jobs.length === 1 ? "" : "s"} currently in your tracker and database.
               </span>
+            </div>
+          )}
+
+          {cleanupType === "duplicates" && (
+            <div
+              className={`p-3.5 rounded-lg border text-xs ${
+                matchingJobs.length > 0
+                  ? "bg-amber-500/10 border-amber-500/30"
+                  : "bg-[#0d1117] border-[#30363d]"
+              }`}
+            >
+              <span
+                className={`font-semibold block mb-1 ${
+                  matchingJobs.length > 0 ? "text-amber-300" : "text-[#c9d1d9]"
+                }`}
+              >
+                {matchingJobs.length > 0
+                  ? `Found ${matchingJobs.length} Duplicate Application${
+                      matchingJobs.length === 1 ? "" : "s"
+                    }`
+                  : "No Duplicates Found"}
+              </span>
+              <p className="text-[#8b949e] leading-relaxed">
+                {matchingJobs.length > 0
+                  ? "Keeps the first instance of each application (matching company, role, and date) and deletes the identical duplicate copies from your database."
+                  : "All applications in your tracker have unique company, role, or date combinations."}
+              </p>
             </div>
           )}
 
@@ -341,13 +403,24 @@ export default function CleanUpModal({
           </button>
           <button
             type="button"
-            disabled={matchingJobs.length === 0}
+            disabled={matchingJobs.length === 0 || isDeleting}
             onClick={() => setIsConfirmOpen(true)}
-            className="text-xs font-medium text-white bg-[#da3633] hover:bg-[#b62324] disabled:opacity-40 disabled:hover:bg-[#da3633] px-4 py-1.5 rounded-md transition-colors cursor-pointer shadow-xs"
+            className="text-xs font-medium text-white bg-[#da3633] hover:bg-[#b62324] disabled:opacity-40 disabled:hover:bg-[#da3633] px-4 py-1.5 rounded-md transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
           >
-            {cleanupType === "all"
-              ? `Delete All (${matchingJobs.length}) Applications`
-              : `Delete ${matchingJobs.length > 0 ? matchingJobs.length : ""} Application${matchingJobs.length === 1 ? "" : "s"}`}
+            {isDeleting ? (
+              <>
+                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                <span>Deleting...</span>
+              </>
+            ) : cleanupType === "all" ? (
+              `Delete All (${matchingJobs.length}) Applications`
+            ) : cleanupType === "duplicates" ? (
+              `Delete ${matchingJobs.length} Duplicate${matchingJobs.length === 1 ? "" : "s"}`
+            ) : (
+              `Delete ${matchingJobs.length > 0 ? matchingJobs.length : ""} Application${
+                matchingJobs.length === 1 ? "" : "s"
+              }`
+            )}
           </button>
         </div>
       </div>
@@ -356,13 +429,31 @@ export default function CleanUpModal({
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={executeDelete}
-        title={cleanupType === "all" ? "Delete All Applications" : "Delete Applications"}
+        title={
+          cleanupType === "all"
+            ? "Delete All Applications"
+            : cleanupType === "duplicates"
+            ? "Delete Duplicate Applications"
+            : "Delete Applications"
+        }
         message={
           cleanupType === "all"
-            ? `Are you sure you want to permanently delete ALL ${matchingJobs.length} applications? This cannot be undone.`
-            : `Are you sure you want to permanently delete ${matchingJobs.length} application${matchingJobs.length === 1 ? "" : "s"}? This cannot be undone.`
+            ? `Are you sure you want to permanently delete ALL ${matchingJobs.length} applications from your tracker and database? This cannot be undone.`
+            : cleanupType === "duplicates"
+            ? `Are you sure you want to delete ${matchingJobs.length} duplicate application${
+                matchingJobs.length === 1 ? "" : "s"
+              }? The original copy of each application will be kept.`
+            : `Are you sure you want to permanently delete ${matchingJobs.length} application${
+                matchingJobs.length === 1 ? "" : "s"
+              }? This cannot be undone.`
         }
-        confirmText={cleanupType === "all" ? "Delete All" : "Delete"}
+        confirmText={
+          cleanupType === "all"
+            ? "Delete All"
+            : cleanupType === "duplicates"
+            ? "Delete Duplicates"
+            : "Delete"
+        }
         isDestructive={true}
       />
     </div>
