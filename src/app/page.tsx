@@ -88,22 +88,33 @@ export default function Home() {
       console.error("Failed to migrate guest applications to account:", e);
     }
 
-    // Load full applications list from Supabase
+    // Load full applications list from Supabase with range pagination so >1000 rows load completely
     try {
-      const { data, error } = await supabase
-        .from("applications")
-        .select("*")
-        .order("applied_date", { ascending: true })
-        .order("created_at", { ascending: true });
+      const allRows: Record<string, unknown>[] = [];
+      let from = 0;
+      const step = 1000;
 
-      if (error) {
-        console.error("Error fetching applications:", error.message);
-        return;
+      while (true) {
+        const { data, error } = await supabase
+          .from("applications")
+          .select("*")
+          .order("applied_date", { ascending: true })
+          .order("created_at", { ascending: true })
+          .range(from, from + step - 1);
+
+        if (error) {
+          console.error("Error fetching applications:", error.message);
+          return;
+        }
+
+        if (!data || data.length === 0) break;
+        allRows.push(...data);
+        if (data.length < step) break;
+        from += step;
       }
 
-      if (data) {
-        const map: Record<string, JobApplication> = {};
-        for (const row of data) {
+      const map: Record<string, JobApplication> = {};
+      for (const row of allRows as Array<Record<string, any>>) {
           let parsedRequirements: string[] | undefined = undefined;
           let cleanedCustomFields: Record<string, string> | undefined = undefined;
 
@@ -159,7 +170,6 @@ export default function Home() {
           };
         }
         setJobs(map);
-      }
     } catch (err) {
       console.error("Failed to connect to database:", err);
     } finally {
@@ -380,13 +390,17 @@ export default function Home() {
     }
 
     try {
-      const { error } = await supabase
-        .from("applications")
-        .delete()
-        .in("id", ids);
+      const CHUNK_SIZE = 200;
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        const chunk = ids.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase
+          .from("applications")
+          .delete()
+          .in("id", chunk);
 
-      if (error) {
-        console.error("Error bulk deleting applications in database:", error.message);
+        if (error) {
+          console.error("Error bulk deleting applications in database:", error.message);
+        }
       }
     } catch (err) {
       console.error("Failed to bulk delete applications from database:", err);
@@ -424,17 +438,21 @@ export default function Home() {
         custom_fields: job.customFields || {},
       }));
 
-      let { error } = await supabase
-        .from("applications")
-        .insert(rowsToInsert);
+      const CHUNK_SIZE = 500;
+      for (let i = 0; i < rowsToInsert.length; i += CHUNK_SIZE) {
+        const chunk = rowsToInsert.slice(i, i + CHUNK_SIZE);
+        let { error } = await supabase
+          .from("applications")
+          .insert(chunk);
 
-      if (error && error.message?.includes("custom_fields")) {
-        const fallbackRows = rowsToInsert.map(({ custom_fields, ...rest }) => rest);
-        error = (await supabase.from("applications").insert(fallbackRows)).error;
-      }
+        if (error && error.message?.includes("custom_fields")) {
+          const fallbackRows = chunk.map(({ custom_fields, ...rest }) => rest);
+          error = (await supabase.from("applications").insert(fallbackRows)).error;
+        }
 
-      if (error) {
-        console.error("Error saving imported jobs to database:", error.message);
+        if (error) {
+          console.error("Error saving imported jobs to database:", error.message);
+        }
       }
     } catch (err) {
       console.error("Failed to insert imported jobs into database:", err);
