@@ -19,9 +19,23 @@
   },
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "scripting"
   ],
   "host_permissions": [
-    "https://*.supabase.co/*"
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://localhost/*",
+        "*://127.0.0.1/*",
+        "*://*.vercel.app/*",
+        "*://*/*jobtrace*",
+        "*://*/*job-trace*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
   ]
 }

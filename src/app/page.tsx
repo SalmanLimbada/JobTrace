@@ -92,7 +92,8 @@ export default function Home() {
       const { data, error } = await supabase
         .from("applications")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("applied_date", { ascending: true })
+        .order("created_at", { ascending: true });
 
       if (error) {
         console.error("Error fetching applications:", error.message);

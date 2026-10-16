@@ -89,14 +89,12 @@ export const DEFAULT_EXTENSION_TARGET_FIELDS = [
 ];
 
 export interface ExtensionSettings {
-  autoApprove: boolean;
   extractRequirements: boolean;
   requirementsDisplay: RequirementsDisplayMode;
   targetFields: string[];
 }
 
 export const DEFAULT_EXTENSION_SETTINGS: ExtensionSettings = {
-  autoApprove: false,
   extractRequirements: true,
   requirementsDisplay: "drawer",
   targetFields: DEFAULT_EXTENSION_TARGET_FIELDS,
@@ -315,6 +313,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setStandardColumns(updated);
     try {
       localStorage.setItem(STORAGE_STANDARD_COLS_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event("jobtrace_settings_updated"));
     } catch {}
   };
 
@@ -322,6 +321,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setCustomFields(fields);
     try {
       localStorage.setItem(STORAGE_FIELDS_KEY, JSON.stringify(fields));
+      window.dispatchEvent(new Event("jobtrace_settings_updated"));
     } catch {}
 
     // Make sure columnOrder has any new field
@@ -564,6 +564,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
       try {
         localStorage.setItem(STORAGE_EXTENSION_SETTINGS_KEY, JSON.stringify(next));
+        window.dispatchEvent(new Event("jobtrace_settings_updated"));
       } catch {}
       return next;
     });

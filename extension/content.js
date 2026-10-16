@@ -1,0 +1,43 @@
+// Content script for JobTrace web app
+// Automatically syncs tracked columns and settings from the web dashboard into Chrome extension storage
+
+(function () {
+  function syncSettings() {
+    try {
+      const ext = localStorage.getItem("jobtrace_extension_settings");
+      const stdCols = localStorage.getItem("jobtrace_standard_columns");
+      const customFields = localStorage.getItem("jobtrace_custom_fields_v2");
+      const auth = localStorage.getItem("sb-gphwulqaetaxxmzfurlr-auth-token");
+      let uid = null;
+      if (auth) {
+        try {
+          const parsed = JSON.parse(auth);
+          uid = parsed?.user?.id || parsed?.id || null;
+        } catch (e) {}
+      }
+
+      const payload = {};
+      if (ext) {
+        try { payload.extensionSettings = JSON.parse(ext); } catch (e) {}
+      }
+      if (stdCols) {
+        try { payload.standardColumns = JSON.parse(stdCols); } catch (e) {}
+      }
+      if (customFields) {
+        try { payload.customFields = JSON.parse(customFields); } catch (e) {}
+      }
+      if (uid) payload.userId = uid;
+
+      if (Object.keys(payload).length > 0 && typeof chrome !== "undefined" && chrome?.storage?.local) {
+        chrome.storage.local.set(payload);
+      }
+    } catch (e) {}
+  }
+
+  // Initial sync when opening or refreshing dashboard
+  syncSettings();
+
+  // Listen for storage events and app events
+  window.addEventListener("storage", syncSettings);
+  window.addEventListener("jobtrace_settings_updated", syncSettings);
+})();

@@ -14,6 +14,8 @@ import {
   type StandardColumnsSettings,
 } from "@/context/SettingsContext";
 
+const STORAGE_SORT_KEY = "jobtrace_table_sort";
+
 interface JobTableProps {
   jobs: JobApplication[];
   onStatusChange: (id: string, newStatus: ApplicationStatus) => void;
@@ -73,8 +75,26 @@ export default function JobTable({
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
-  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<string>("appliedDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  // Load saved sort preference from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_SORT_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          parsed &&
+          typeof parsed.column === "string" &&
+          (parsed.direction === "asc" || parsed.direction === "desc")
+        ) {
+          setSortColumn(parsed.column);
+          setSortDirection(parsed.direction);
+        }
+      }
+    } catch {}
+  }, []);
 
   const [draggedColId, setDraggedColId] = useState<string | null>(null);
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
@@ -189,17 +209,24 @@ export default function JobTable({
 
   function handleHeaderClick(colId: string) {
     if (isDraggingRef.current) return;
+    let nextCol = colId;
+    let nextDir: "asc" | "desc" = "asc";
+
     if (sortColumn === colId) {
-      if (sortDirection === "asc") {
-        setSortDirection("desc");
-      } else {
-        setSortColumn(null);
-        setSortDirection("asc");
-      }
+      nextDir = sortDirection === "asc" ? "desc" : "asc";
     } else {
-      setSortColumn(colId);
-      setSortDirection("asc");
+      nextCol = colId;
+      nextDir = "asc";
     }
+
+    setSortColumn(nextCol);
+    setSortDirection(nextDir);
+    try {
+      localStorage.setItem(
+        STORAGE_SORT_KEY,
+        JSON.stringify({ column: nextCol, direction: nextDir })
+      );
+    } catch {}
   }
 
   function getColumnLabel(colId: string): string {
@@ -283,35 +310,44 @@ export default function JobTable({
     return matchesStatus && matchesSearch;
   });
 
-  // Sorted jobs
-  const sortedJobs = [...filteredJobs].sort((a, b) => {
-    if (!sortColumn) return 0;
-    let valA = "";
-    let valB = "";
+  // Sorted jobs (defaulting to appliedDate ascending; tie-break preserves insertion order)
+  const sortedJobs = useMemo(() => {
+    const indexMap = new Map<string, number>();
+    filteredJobs.forEach((j, i) => indexMap.set(j.id, i));
 
-    if (sortColumn === "company") {
-      valA = a.company || "";
-      valB = b.company || "";
-    } else if (sortColumn === "role") {
-      valA = a.role || "";
-      valB = b.role || "";
-    } else if (sortColumn === "status") {
-      valA = a.status || "";
-      valB = b.status || "";
-    } else if (sortColumn === "appliedDate") {
-      valA = a.appliedDate || "";
-      valB = b.appliedDate || "";
-    } else if (sortColumn === "url") {
-      valA = a.url || "";
-      valB = b.url || "";
-    } else {
-      valA = getFieldValue(a, sortColumn) || "";
-      valB = getFieldValue(b, sortColumn) || "";
-    }
+    return [...filteredJobs].sort((a, b) => {
+      let valA = "";
+      let valB = "";
 
-    const cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: "base" });
-    return sortDirection === "asc" ? cmp : -cmp;
-  });
+      if (sortColumn === "company") {
+        valA = a.company || "";
+        valB = b.company || "";
+      } else if (sortColumn === "role") {
+        valA = a.role || "";
+        valB = b.role || "";
+      } else if (sortColumn === "status") {
+        valA = a.status || "";
+        valB = b.status || "";
+      } else if (sortColumn === "appliedDate") {
+        valA = a.appliedDate || "";
+        valB = b.appliedDate || "";
+      } else if (sortColumn === "url") {
+        valA = a.url || "";
+        valB = b.url || "";
+      } else {
+        valA = getFieldValue(a, sortColumn) || "";
+        valB = getFieldValue(b, sortColumn) || "";
+      }
+
+      const cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: "base" });
+      if (cmp !== 0) {
+        return sortDirection === "asc" ? cmp : -cmp;
+      }
+      const idxA = indexMap.get(a.id) ?? 0;
+      const idxB = indexMap.get(b.id) ?? 0;
+      return idxA - idxB;
+    });
+  }, [filteredJobs, sortColumn, sortDirection]);
 
   function renderCell(job: JobApplication, colId: string) {
     switch (colId) {

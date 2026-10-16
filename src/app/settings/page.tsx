@@ -72,35 +72,41 @@ export default function SettingsPage() {
     setStatusError("");
   };
 
-  const standardTargetFields = [
-    { id: "company", label: "Company" },
-    { id: "role", label: "Role Title" },
-    { id: "url", label: "Posting URL" },
-    { id: "location", label: "Location" },
-    { id: "salary", label: "Salary" },
-    { id: "notes", label: "Notes" },
-    { id: "keyRequirements", label: "Key Requirements" },
+  const isSalaryEnabled = customFields.find((f) => f.id === "salary")?.enabled ?? true;
+  const isLocationEnabled = customFields.find((f) => f.id === "location")?.enabled ?? true;
+  const isUrlEnabled = standardColumns.url ?? true;
+
+  const unifiedScraperFields = [
+    {
+      id: "salary",
+      label: "Salary",
+      desc: "Show in table and scrape compensation ranges",
+      checked: isSalaryEnabled,
+      onToggle: () => toggleCustomField("salary"),
+    },
+    {
+      id: "location",
+      label: "Location",
+      desc: "Show in table and scrape city / remote status",
+      checked: isLocationEnabled,
+      onToggle: () => toggleCustomField("location"),
+    },
+    {
+      id: "url",
+      label: "Posting URL",
+      desc: "Show in table and save application links",
+      checked: isUrlEnabled,
+      onToggle: () => toggleStandardColumn("url"),
+    },
+    {
+      id: "keyRequirements",
+      label: "Key Requirements",
+      desc: "Parse qualification bullets into tracker",
+      checked: extensionSettings.extractRequirements,
+      onToggle: () =>
+        updateExtensionSettings({ extractRequirements: !extensionSettings.extractRequirements }),
+    },
   ];
-
-  const seenFieldIds = new Set<string>();
-  const availableTargetFields = [
-    ...standardTargetFields,
-    ...customFields
-      .filter((f) => f.enabled)
-      .map((f) => ({ id: f.id, label: f.name })),
-  ].filter((f) => {
-    if (seenFieldIds.has(f.id)) return false;
-    seenFieldIds.add(f.id);
-    return true;
-  });
-
-  const toggleTargetField = (fieldId: string) => {
-    const current = extensionSettings.targetFields || DEFAULT_EXTENSION_TARGET_FIELDS;
-    const next = current.includes(fieldId)
-      ? current.filter((f) => f !== fieldId)
-      : [...current, fieldId];
-    updateExtensionSettings({ targetFields: next });
-  };
 
   const SECTIONS: { id: SettingsSection; label: string; desc: string }[] = [
     {
@@ -186,29 +192,8 @@ export default function SettingsPage() {
                     Chrome Extension
                   </h2>
                   <p className="text-xs text-[#8b949e] mt-0.5">
-                    Configure scraping defaults, approval behavior, and target fields.
+                    Configure scraping defaults and target extraction fields.
                   </p>
-                </div>
-
-                {/* Auto Approve Toggle */}
-                <div className="p-5 flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <span className="text-xs font-medium text-[#f0f6fc] block">
-                      Auto-approve captures
-                    </span>
-                    <p className="text-xs text-[#8b949e] leading-relaxed">
-                      Save scraped jobs directly to the tracker without showing a preview modal.
-                    </p>
-                  </div>
-
-                  <input
-                    type="checkbox"
-                    checked={extensionSettings.autoApprove}
-                    onChange={(e) =>
-                      updateExtensionSettings({ autoApprove: e.target.checked })
-                    }
-                    className="mt-1 w-4 h-4 accent-[#58a6ff] cursor-pointer"
-                  />
                 </div>
 
                 {/* Extraction Toggle */}
@@ -297,39 +282,39 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {/* Target Fields Selection */}
+                {/* Unified Scraper & Table Fields */}
                 <div className="p-5 space-y-3">
                   <div>
                     <span className="text-xs font-medium text-[#f0f6fc] block">
-                      Fields to Capture
+                      Tracked Fields & Scraper
                     </span>
                     <p className="text-xs text-[#8b949e] mt-0.5">
-                      Select which fields the extension should detect and extract from the page.
+                      Changing a field here immediately toggles it for both your dashboard table columns and the extension scraper.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {availableTargetFields.map((field) => {
-                      const isChecked = (
-                        extensionSettings.targetFields || DEFAULT_EXTENSION_TARGET_FIELDS
-                      ).includes(field.id);
-                      return (
-                        <label
-                          key={field.id}
-                          className="flex items-center justify-between p-2.5 rounded-md border border-[#30363d] bg-[#0d1117] hover:border-[#58a6ff]/40 transition-colors cursor-pointer"
-                        >
-                          <span className="text-xs text-[#f0f6fc] font-medium">
+                    {unifiedScraperFields.map((field) => (
+                      <label
+                        key={field.id}
+                        className="flex items-start justify-between p-3 rounded-md border border-[#30363d] bg-[#0d1117] hover:border-[#58a6ff]/40 transition-colors cursor-pointer gap-2"
+                      >
+                        <div>
+                          <span className="text-xs text-[#f0f6fc] font-medium block">
                             {field.label}
                           </span>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => toggleTargetField(field.id)}
-                            className="w-4 h-4 accent-[#58a6ff] cursor-pointer"
-                          />
-                        </label>
-                      );
-                    })}
+                          <span className="text-[11px] text-[#8b949e] block mt-0.5">
+                            {field.desc}
+                          </span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={field.checked}
+                          onChange={field.onToggle}
+                          className="w-4 h-4 accent-[#58a6ff] cursor-pointer mt-0.5 shrink-0"
+                        />
+                      </label>
+                    ))}
                   </div>
                 </div>
 

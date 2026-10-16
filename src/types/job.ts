@@ -12,7 +12,6 @@ export interface CustomFieldDefinition {
 export type RequirementsDisplayMode = "drawer" | "column";
 
 export interface ExtensionSettings {
-  autoApprove: boolean;
   extractRequirements: boolean;
   requirementsDisplay: RequirementsDisplayMode;
   targetFields: string[];

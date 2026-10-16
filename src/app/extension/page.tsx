@@ -139,7 +139,7 @@ export default function ExtensionPage() {
               <div>
                 <p className="font-medium text-[#f0f6fc]">Review & Save</p>
                 <p className="text-[#8b949e] mt-0.5">
-                  Review extracted fields and save directly to your tracker. Enable &quot;Auto-approve&quot; in Settings if you want to skip preview and save immediately.
+                  Review extracted fields and save directly to your tracker in one click.
                 </p>
               </div>
             </div>
