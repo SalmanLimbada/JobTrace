@@ -435,7 +435,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const setTheme = (newTheme: AppTheme) => {
     setThemeState(newTheme);
+    document.documentElement.classList.add("theme-transitioning");
     document.documentElement.setAttribute("data-theme", newTheme);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.documentElement.classList.remove("theme-transitioning");
+      });
+    });
     try {
       localStorage.setItem(STORAGE_THEME_KEY, newTheme);
     } catch {}

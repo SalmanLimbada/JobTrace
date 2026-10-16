@@ -15,7 +15,20 @@
 body {
   background: #0d1117;
   color: #c9d1d9;
-  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Instant lag-free theme toggle across thousands of records */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: none !important;
+}
+
+/* Off-screen rendering optimization: skips painting/style calculations for rows outside the viewport */
+tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 45px;
 }
 
 /* --- Clean, Instant Light Mode --- */
@@ -156,17 +169,21 @@ html[data-theme="light"] .status-badge-select option {
   color: #1f2328 !important;
 }
 
-/* --- Row Left Status Border Highlights in Light Mode --- */
-html[data-theme="light"] tr.row-border-offer {
+/* --- Row & Card Left Status Border Highlights in Light Mode --- */
+html[data-theme="light"] tr.row-border-offer,
+html[data-theme="light"] div.row-border-offer {
   border-left-color: #1a7f37 !important;
 }
-html[data-theme="light"] tr.row-border-interview {
+html[data-theme="light"] tr.row-border-interview,
+html[data-theme="light"] div.row-border-interview {
   border-left-color: #9a6700 !important;
 }
-html[data-theme="light"] tr.row-border-applied {
+html[data-theme="light"] tr.row-border-applied,
+html[data-theme="light"] div.row-border-applied {
   border-left-color: #0969da !important;
 }
-html[data-theme="light"] tr.row-border-rejected {
+html[data-theme="light"] tr.row-border-rejected,
+html[data-theme="light"] div.row-border-rejected {
   border-left-color: #cf222e !important;
 }
 
