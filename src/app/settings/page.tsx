@@ -149,7 +149,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] flex flex-col font-sans">
       <Navbar />
 
-      <main className="p-4 sm:p-8 max-w-5xl mx-auto w-full flex-1">
+      <main className="p-3.5 sm:p-8 max-w-5xl mx-auto w-full flex-1">
         {/* Header */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -203,9 +203,9 @@ export default function SettingsPage() {
         </div>
 
         {/* Layout: Sidebar + Settings Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-          {/* Navigation Sidebar */}
-          <aside className="md:col-span-4 lg:col-span-3 space-y-0.5 border border-[#30363d] bg-[#161b22] p-1.5 rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-6 items-start">
+          {/* Navigation Sidebar: Horizontal swipeable tabs on mobile, vertical sidebar on desktop */}
+          <aside className="md:col-span-4 lg:col-span-3 flex md:flex-col overflow-x-auto no-scrollbar gap-1 border border-[#30363d] bg-[#161b22] p-1.5 rounded-lg shrink-0 -mx-1 px-1 sm:mx-0 sm:px-1.5">
             {SECTIONS.map((sec) => {
               const isActive = activeSection === sec.id;
               return (
@@ -213,14 +213,14 @@ export default function SettingsPage() {
                   key={sec.id}
                   type="button"
                   onClick={() => setActiveSection(sec.id)}
-                  className={`w-full flex flex-col items-start px-3 py-2 rounded-md text-left transition-colors cursor-pointer ${
+                  className={`flex flex-col items-start px-3 py-1.5 md:py-2 rounded-md text-left transition-colors cursor-pointer shrink-0 whitespace-nowrap md:whitespace-normal ${
                     isActive
                       ? "bg-[#21262d] text-[#f0f6fc] font-medium"
                       : "text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#21262d]/40"
                   }`}
                 >
                   <span className="text-xs font-medium">{sec.label}</span>
-                  <span className="text-[11px] text-[#8b949e] opacity-80 truncate max-w-full">
+                  <span className="text-[11px] text-[#8b949e] opacity-80 truncate max-w-full hidden md:inline">
                     {sec.desc}
                   </span>
                 </button>

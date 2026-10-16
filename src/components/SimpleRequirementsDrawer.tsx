@@ -35,8 +35,8 @@ export default function SimpleRequirementsDrawer({
         onClick={onClose}
       />
 
-      <div className="fixed inset-y-0 right-0 flex max-w-full pl-6 sm:pl-10">
-        <div className="w-screen max-w-md bg-[#0d1117] border-l border-[#30363d] shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
+      <div className="fixed inset-y-0 right-0 flex max-w-full pl-0 sm:pl-10">
+        <div className="w-screen max-w-full sm:max-w-md bg-[#0d1117] border-l border-[#30363d] shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
           {/* Header */}
           <div className="px-5 py-4 border-b border-[#30363d] bg-[#161b22] flex items-center justify-between shrink-0">
             <div className="min-w-0 pr-2">

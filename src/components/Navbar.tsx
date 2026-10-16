@@ -58,15 +58,15 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
   return (
     <>
       <header className="border-b border-[#30363d] bg-[#161b22] sticky top-0 z-40">
-        <div className="max-w-5xl mx-auto px-3 sm:px-8 h-14 flex items-center justify-between gap-3">
+        <div className="max-w-5xl mx-auto px-2.5 sm:px-8 h-14 flex items-center justify-between gap-1.5 sm:gap-3">
           {/* Left: Brand Logo & Title */}
-          <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-6 shrink-0">
             <Link
               href="/"
-              className="flex items-center gap-2 select-none hover:opacity-90 transition-opacity"
+              className="flex items-center gap-1.5 sm:gap-2 select-none hover:opacity-90 transition-opacity"
             >
               <svg
-                className="h-6 w-6 shrink-0"
+                className="h-5 w-5 sm:h-6 sm:w-6 shrink-0"
                 viewBox="0 4 64 64"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
@@ -123,20 +123,20 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
                   strokeLinejoin="round"
                 />
               </svg>
-              <span className="font-bold text-base text-[#f0f6fc] tracking-tight leading-none translate-y-px">
+              <span className="font-bold text-sm sm:text-base text-[#f0f6fc] tracking-tight leading-none translate-y-px hidden xs:inline">
                 JobTrace
               </span>
             </Link>
 
             {/* Navigation Links: Tracker, Extension, Settings */}
-            <nav className="flex items-center gap-1 sm:gap-1.5">
+            <nav className="flex items-center gap-0.5 sm:gap-1.5">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href;
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    className={`px-2 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs font-medium transition-colors cursor-pointer ${
                       isActive
                         ? "bg-[#21262d] text-[#f0f6fc] border border-[#30363d] shadow-2xs font-semibold"
                         : "text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#21262d]/50"
@@ -150,12 +150,12 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
           </div>
 
           {/* Right: Theme Switch & Profile */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Theme Slider Pill */}
-            <div className="theme-slider-track relative flex items-center bg-[#0d1117] p-0.5 rounded-full border border-[#30363d] w-[64px] sm:w-[68px] h-[28px] shadow-inner shrink-0">
+            <div className="theme-slider-track relative flex items-center bg-[#0d1117] p-0.5 rounded-full border border-[#30363d] w-[58px] sm:w-[68px] h-[26px] sm:h-[28px] shadow-inner shrink-0">
               <div
-                className={`theme-slider-thumb absolute top-0.5 bottom-0.5 left-0.5 w-[28px] sm:w-[30px] rounded-full bg-white/15 backdrop-blur-md border border-white/20 shadow-xs transition-transform duration-200 ease-out pointer-events-none ${
-                  theme === "light" ? "translate-x-[32px] sm:translate-x-[34px]" : "translate-x-0"
+                className={`theme-slider-thumb absolute top-0.5 bottom-0.5 left-0.5 w-[25px] sm:w-[30px] rounded-full bg-white/15 backdrop-blur-md border border-white/20 shadow-xs transition-transform duration-200 ease-out pointer-events-none ${
+                  theme === "light" ? "translate-x-[29px] sm:translate-x-[34px]" : "translate-x-0"
                 }`}
               />
               <button
@@ -187,20 +187,20 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
             </div>
 
             {isLoading ? (
-              <div className="h-7 w-16 rounded-md bg-[#21262d] animate-pulse" />
+              <div className="h-7 w-12 sm:w-16 rounded-md bg-[#21262d] animate-pulse" />
             ) : user ? (
               <div className="relative" ref={profileRef}>
                 <button
                   type="button"
                   onClick={() => setIsProfileOpen((prev) => !prev)}
-                  className="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 pr-2 sm:pr-2.5 py-1 rounded-md text-xs font-medium text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] transition-colors cursor-pointer select-none"
+                  className="flex items-center gap-1 sm:gap-2 px-1.5 sm:px-2 py-1 rounded-md text-xs font-medium text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] transition-colors cursor-pointer select-none"
                   aria-expanded={isProfileOpen}
                   aria-haspopup="true"
                 >
                   <span className="w-5 h-5 rounded-full bg-[#58a6ff]/20 text-[#58a6ff] border border-[#58a6ff]/30 flex items-center justify-center font-bold text-[10px] shrink-0 uppercase">
                     {user.email ? user.email[0] : "U"}
                   </span>
-                  <span className="hidden sm:inline max-w-[140px] truncate text-left">
+                  <span className="hidden md:inline max-w-[140px] truncate text-left">
                     {user.email}
                   </span>
                   <svg

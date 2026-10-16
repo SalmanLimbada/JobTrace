@@ -191,13 +191,13 @@ export default function JobForm({ onAddJob }: JobFormProps) {
   }
 
   return (
-    <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-5 mb-8 shadow-sm">
-      <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">
+    <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 sm:p-5 mb-6 sm:mb-8 shadow-sm">
+      <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2.5 sm:mb-3">
         Add New Application
       </h2>
       <form
         onSubmit={handleSubmit}
-        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 items-center"
+        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2.5 sm:gap-3 items-center"
       >
         {orderedFormColIds.map((colId) => renderField(colId))}
 

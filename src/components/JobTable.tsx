@@ -408,13 +408,13 @@ export default function JobTable({
     switch (colId) {
       case "company":
         return (
-          <td key={colId} className="p-3 font-medium text-zinc-100">
+          <td key={colId} className="p-2.5 sm:p-3 font-medium text-zinc-100 whitespace-nowrap">
             {job.company}
           </td>
         );
       case "role":
         return (
-          <td key={colId} className="p-3 text-zinc-300">
+          <td key={colId} className="p-2.5 sm:p-3 text-zinc-300 whitespace-nowrap">
             <div className="flex items-center gap-2">
               <span className="font-medium text-zinc-100">{job.role}</span>
               {extensionSettings?.extractRequirements &&
@@ -439,7 +439,7 @@ export default function JobTable({
       case "keyRequirements": {
         const reqs = job.keyRequirements || [];
         return (
-          <td key={colId} className="p-3">
+          <td key={colId} className="p-2.5 sm:p-3 whitespace-nowrap">
             {reqs.length === 0 ? (
               <span className="text-zinc-600 text-xs font-mono">—</span>
             ) : (
@@ -457,7 +457,7 @@ export default function JobTable({
       case "status": {
         const badgeStyle = getStatusBadgeStyle(job.status);
         return (
-          <td key={colId} className="p-3">
+          <td key={colId} className="p-2.5 sm:p-3 whitespace-nowrap">
             <select
               value={job.status}
               onChange={(e) => onStatusChange(job.id, e.target.value as ApplicationStatus)}
@@ -474,14 +474,14 @@ export default function JobTable({
       }
       case "appliedDate":
         return (
-          <td key={colId} className="p-3 text-zinc-400 text-xs font-mono">
+          <td key={colId} className="p-2.5 sm:p-3 text-zinc-400 text-xs font-mono whitespace-nowrap">
             {job.appliedDate}
           </td>
         );
       case "url": {
         const validUrl = formatUrl(job.url);
         return (
-          <td key={colId} className="p-3">
+          <td key={colId} className="p-2.5 sm:p-3 whitespace-nowrap">
             {validUrl ? (
               <a
                 href={validUrl}
@@ -503,7 +503,7 @@ export default function JobTable({
         return (
           <td
             key={colId}
-            className={`p-3 text-xs ${
+            className={`p-2.5 sm:p-3 text-xs whitespace-nowrap ${
               colId === "notes"
                 ? "text-zinc-400 max-w-xs truncate"
                 : customField?.type === "date"
@@ -606,7 +606,7 @@ export default function JobTable({
         </div>
 
         {/* Segmented Status Pill Bar with iOS Sliding Frosted Glass Thumb */}
-        <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 -mx-1 px-1 sm:mx-0 sm:px-0">
           <div
             ref={pillTrackRef}
             className="filter-toggle-track relative inline-flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-1 max-w-full shadow-inner gap-0.5 shrink-0"
@@ -766,11 +766,11 @@ export default function JobTable({
       </div>
 
       {/* Table Container */}
-      <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/20 shadow-sm">
+      <div className="overflow-x-auto rounded-none sm:rounded-xl border-y sm:border border-zinc-800 bg-zinc-900/20 shadow-sm -mx-3 sm:mx-0">
         <table className="w-full text-left">
           <thead className="bg-zinc-900/90 text-zinc-400 text-xs uppercase font-medium border-b border-zinc-800">
             <tr className="border-l-2 border-l-transparent">
-              <th className={`${showRowNumbers ? "w-10 px-2" : "w-8 p-0"} text-center font-mono text-[11px]`}>
+              <th className={`${showRowNumbers ? "w-9 sm:w-10 px-1.5 sm:px-2" : "w-7 sm:w-8 p-0"} text-center font-mono text-[11px]`}>
                 {showRowNumbers ? "#" : ""}
               </th>
               {orderedVisibleColumns.map((colId) => {
@@ -824,7 +824,7 @@ export default function JobTable({
                       }, 100);
                     }}
                     onClick={() => handleHeaderClick(colId)}
-                    className={`p-3.5 whitespace-nowrap select-none transition-all duration-150 group/header relative ${
+                    className={`p-2.5 sm:p-3.5 whitespace-nowrap select-none transition-all duration-150 group/header relative ${
                       isDragged
                         ? "opacity-30 bg-zinc-800/80 cursor-grabbing"
                         : "cursor-grab active:cursor-grabbing hover:text-zinc-200"
