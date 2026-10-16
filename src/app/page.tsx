@@ -350,6 +350,31 @@ export default function Home() {
     }
   }
 
+  async function handleDeleteJobs(ids: string[]) {
+    if (ids.length === 0) return;
+    const nextJobs = { ...jobs };
+    ids.forEach((id) => delete nextJobs[id]);
+    setJobs(nextJobs);
+
+    if (!user) {
+      saveGuestJobs(nextJobs);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("applications")
+        .delete()
+        .in("id", ids);
+
+      if (error) {
+        console.error("Error bulk deleting applications in database:", error.message);
+      }
+    } catch (err) {
+      console.error("Failed to bulk delete applications from database:", err);
+    }
+  }
+
   async function handleImportJobs(newJobsMap: Record<string, JobApplication>) {
     const jobArray = Object.values(newJobsMap);
     if (jobArray.length === 0) return;
@@ -482,6 +507,7 @@ export default function Home() {
             onStatusChange={handleStatusChange}
             onSaveEdit={handleSaveEdit}
             onDeleteJob={handleDeleteJob}
+            onDeleteJobs={handleDeleteJobs}
             onImportJobs={handleImportJobs}
           />
         )}

@@ -424,10 +424,125 @@ function renderRequirements(bullets) {
 
 let tableStandardColumns = null;
 let tableCustomFields = null;
+let extensionCustomFields = [];
 let isSalaryActive = true;
 let isLocationActive = true;
 let isUrlActive = true;
 let isNotesActive = true;
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function renderCustomFields() {
+  const container = document.getElementById("customFieldsContainer");
+  if (!container) return;
+  container.innerHTML = "";
+
+  extensionCustomFields.forEach((field) => {
+    const row = document.createElement("div");
+    row.className = "custom-field-row";
+    row.innerHTML = `
+      <div class="custom-field-header">
+        <label for="custom_field_${field.id}">${escapeHtml(field.name)}</label>
+        <button type="button" class="custom-field-delete" data-id="${field.id}" title="Remove this field">×</button>
+      </div>
+      <input type="text" class="custom-field-input" id="custom_field_${field.id}" data-id="${field.id}" data-name="${escapeHtml(field.name)}" placeholder="Enter ${escapeHtml(field.name)}..." />
+    `;
+
+    const delBtn = row.querySelector(".custom-field-delete");
+    delBtn.addEventListener("click", async () => {
+      extensionCustomFields = extensionCustomFields.filter(f => f.id !== field.id);
+      await chrome.storage.local.set({ extensionCustomFields });
+      renderCustomFields();
+    });
+
+    container.appendChild(row);
+  });
+}
+
+function setupCustomFieldEvents() {
+  const addFieldToggleBtn = document.getElementById("addFieldToggleBtn");
+  const newFieldBox = document.getElementById("newFieldBox");
+  const newFieldNameInput = document.getElementById("newFieldNameInput");
+  const confirmAddFieldBtn = document.getElementById("confirmAddFieldBtn");
+  const cancelAddFieldBtn = document.getElementById("cancelAddFieldBtn");
+
+  if (!addFieldToggleBtn || !newFieldBox) return;
+
+  addFieldToggleBtn.addEventListener("click", () => {
+    newFieldBox.style.display = "block";
+    addFieldToggleBtn.style.display = "none";
+    if (newFieldNameInput) {
+      newFieldNameInput.value = "";
+      newFieldNameInput.focus();
+    }
+  });
+
+  cancelAddFieldBtn?.addEventListener("click", () => {
+    newFieldBox.style.display = "none";
+    addFieldToggleBtn.style.display = "";
+  });
+
+  function handleConfirmAdd() {
+    const rawName = newFieldNameInput.value.trim();
+    if (!rawName) return;
+
+    const id = rawName.toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/^_+|_+$/g, "") || `custom_${Date.now()}`;
+
+    if (!extensionCustomFields.some(f => f.id === id)) {
+      const newField = { id, name: rawName };
+      extensionCustomFields.push(newField);
+      chrome.storage.local.set({ extensionCustomFields });
+      renderCustomFields();
+      syncNewFieldToOpenTabs(newField);
+    }
+
+    newFieldBox.style.display = "none";
+    addFieldToggleBtn.style.display = "";
+
+    setTimeout(() => {
+      const createdInput = document.getElementById(`custom_field_${id}`);
+      if (createdInput) createdInput.focus();
+    }, 50);
+  }
+
+  confirmAddFieldBtn?.addEventListener("click", handleConfirmAdd);
+  newFieldNameInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleConfirmAdd();
+    } else if (e.key === "Escape") {
+      newFieldBox.style.display = "none";
+      addFieldToggleBtn.style.display = "";
+    }
+  });
+}
+
+async function syncNewFieldToOpenTabs(newField) {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const t of tabs) {
+      if (t.url && (t.url.includes("localhost") || t.url.includes("jobtrace") || t.url.includes("job-trace") || t.url.includes("vercel.app"))) {
+        chrome.scripting.executeScript({
+          target: { tabId: t.id },
+          func: (field) => {
+            try {
+              const raw = localStorage.getItem("jobtrace_custom_fields_v2");
+              const fields = raw ? JSON.parse(raw) : [];
+              if (!fields.some(f => f.id === field.id)) {
+                fields.push({ id: field.id, name: field.name, type: "text", enabled: true });
+                localStorage.setItem("jobtrace_custom_fields_v2", JSON.stringify(fields));
+              }
+            } catch (e) {}
+          },
+          args: [newField]
+        }).catch(() => {});
+      }
+    }
+  } catch (e) {}
+}
 
 // Sync settings from active JobTrace tab or storage
 async function loadSettings() {
@@ -552,6 +667,22 @@ async function loadSettings() {
   if (notesGroup) {
     notesGroup.style.display = isNotesActive ? "" : "none";
   }
+
+  // Load custom fields
+  const storedFields = (await chrome.storage.local.get(["extensionCustomFields"])).extensionCustomFields || [];
+  extensionCustomFields = [...storedFields];
+
+  // Merge any active custom fields from dashboard if present
+  if (tableCustomFields && Array.isArray(tableCustomFields)) {
+    tableCustomFields.forEach(f => {
+      if (f.enabled && !["salary", "location", "notes"].includes(f.id)) {
+        if (!extensionCustomFields.some(existing => existing.id === f.id)) {
+          extensionCustomFields.push({ id: f.id, name: f.name || f.id });
+        }
+      }
+    });
+  }
+  renderCustomFields();
 }
 
 // Scrape active page and populate form
@@ -644,6 +775,16 @@ async function submitApplication() {
     customFieldsPayload._keyRequirements = JSON.stringify(currentRequirements);
   }
 
+  // Collect values from all custom fields
+  const customInputs = document.querySelectorAll(".custom-field-input");
+  customInputs.forEach((input) => {
+    const fieldId = input.getAttribute("data-id");
+    const val = input.value.trim();
+    if (fieldId && val) {
+      customFieldsPayload[fieldId] = val;
+    }
+  });
+
   const payload = {
     id: newId,
     company: companyInput.value.trim(),
@@ -695,6 +836,7 @@ async function submitApplication() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  setupCustomFieldEvents();
   await loadSettings();
   await captureActiveTab();
 

@@ -106,7 +106,7 @@ export default function JobForm({ onAddJob }: JobFormProps) {
             key="company"
             id="new-job-company-input"
             type="text"
-            placeholder="Company (e.g. Amazon)"
+            placeholder="Company *"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
             className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
@@ -118,7 +118,7 @@ export default function JobForm({ onAddJob }: JobFormProps) {
           <input
             key="role"
             type="text"
-            placeholder="Role (e.g. Engineer)"
+            placeholder="Role *"
             value={role}
             onChange={(e) => setRole(e.target.value)}
             className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
@@ -156,7 +156,7 @@ export default function JobForm({ onAddJob }: JobFormProps) {
           <input
             key="url"
             type="text"
-            placeholder="Posting URL (optional)"
+            placeholder="Posting URL"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
@@ -168,7 +168,7 @@ export default function JobForm({ onAddJob }: JobFormProps) {
           <input
             key="notes"
             type="text"
-            placeholder="Notes (optional)"
+            placeholder="Notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
@@ -184,7 +184,7 @@ export default function JobForm({ onAddJob }: JobFormProps) {
               <DatePicker
                 value={fieldValues[colId] || ""}
                 onChange={(val) => handleFieldValueChange(colId, val)}
-                placeholder={`${customField.name} (optional)`}
+                placeholder={customField.name}
                 title={customField.name}
                 className="bg-zinc-950 border border-zinc-800 text-xs rounded-lg px-3 py-2 outline-none focus:border-zinc-500 font-mono h-[38px]"
               />
@@ -195,7 +195,7 @@ export default function JobForm({ onAddJob }: JobFormProps) {
           <input
             key={colId}
             type={customField.type === "number" ? "number" : "text"}
-            placeholder={`${customField.name} (optional)`}
+            placeholder={customField.name}
             value={fieldValues[colId] || ""}
             onChange={(e) => handleFieldValueChange(colId, e.target.value)}
             className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"

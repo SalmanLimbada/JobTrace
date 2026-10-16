@@ -7,6 +7,7 @@ import { exportApplicationsToCSV } from "@/lib/csv";
 import CSVImportModal from "@/components/CSVImportModal";
 import EditJobModal from "@/components/EditJobModal";
 import ExportCSVModal from "@/components/ExportCSVModal";
+import CleanUpModal from "@/components/CleanUpModal";
 import SimpleRequirementsDrawer from "@/components/SimpleRequirementsDrawer";
 import {
   useSettings,
@@ -21,6 +22,7 @@ interface JobTableProps {
   onStatusChange: (id: string, newStatus: ApplicationStatus) => void;
   onSaveEdit: (id: string, updated: Partial<JobApplication>) => void;
   onDeleteJob: (id: string) => void;
+  onDeleteJobs?: (ids: string[]) => void;
   onImportJobs: (newJobs: Record<string, JobApplication>, count: number) => void;
 }
 
@@ -109,6 +111,7 @@ export default function JobTable({
   onStatusChange,
   onSaveEdit,
   onDeleteJob,
+  onDeleteJobs,
   onImportJobs,
 }: JobTableProps) {
   const router = useRouter();
@@ -130,6 +133,7 @@ export default function JobTable({
   const [selectedRequirementsJob, setSelectedRequirementsJob] = useState<JobApplication | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isCleanUpModalOpen, setIsCleanUpModalOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [sortColumn, setSortColumn] = useState<string>("appliedDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -261,7 +265,7 @@ export default function JobTable({
     }
   });
 
-  const totalColumnCount = 1 + orderedVisibleColumns.length;
+  const totalColumnCount = 2 + orderedVisibleColumns.length;
 
   function handleHeaderClick(colId: string) {
     if (isDraggingRef.current) return;
@@ -524,7 +528,7 @@ export default function JobTable({
     <div>
       {/* Search & Status Filter Toolbar */}
       <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between mb-4">
-        <div className="flex items-center gap-2 flex-1 max-w-md">
+        <div className="flex items-center gap-2 flex-1 max-w-lg">
           <div className="relative flex-1">
             <input
               ref={searchInputRef}
@@ -599,6 +603,25 @@ export default function JobTable({
                   <div>
                     <span className="font-medium block">Export Applications</span>
                     <span className="text-[10px] text-[#8b949e] block">Download as CSV or Excel</span>
+                  </div>
+                </button>
+
+                <div className="h-px bg-[#30363d]/60 my-1" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsActionsOpen(false);
+                    setIsCleanUpModalOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors text-left cursor-pointer"
+                >
+                  <svg className="w-4 h-4 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <div>
+                    <span className="font-medium block">Clean Up Applications</span>
+                    <span className="text-[10px] text-zinc-500 block">Bulk delete by status, age, or count</span>
                   </div>
                 </button>
               </div>
@@ -798,7 +821,7 @@ export default function JobTable({
         <table className="w-full text-left">
           <thead className="bg-zinc-900/90 text-zinc-400 text-xs uppercase font-medium border-b border-zinc-800">
             <tr className="border-l-2 border-l-transparent">
-              <th className={`${showRowNumbers ? "w-9 sm:w-10 px-1.5 sm:px-2" : "w-7 sm:w-8 p-0"} text-center font-mono text-[11px]`}>
+              <th className={`${showRowNumbers ? "w-11 px-1.5 sm:px-2" : "w-8 p-0"} text-center font-mono text-[11px]`}>
                 {showRowNumbers ? "#" : ""}
               </th>
               {orderedVisibleColumns.map((colId) => {
@@ -874,6 +897,7 @@ export default function JobTable({
                   </th>
                 );
               })}
+              <th className="w-8 sm:w-10 p-0" />
             </tr>
           </thead>
           <tbody>
@@ -938,6 +962,25 @@ export default function JobTable({
                   </td>
 
                   {orderedVisibleColumns.map((colId) => renderCell(job, colId))}
+
+                  {/* Right-edge: Hover Quick Delete on the other end */}
+                  <td className="w-8 sm:w-10 px-2 text-right select-none">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete application for ${job.company} (${job.role})?`)) {
+                          onDeleteJob(job.id);
+                        }
+                      }}
+                      title="Delete application"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-zinc-500 hover:text-red-400 p-1.5 rounded hover:bg-red-500/10 cursor-pointer inline-flex items-center justify-center"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </td>
                 </tr>
               );
             })
@@ -972,6 +1015,15 @@ export default function JobTable({
         allJobs={jobs}
         filteredJobs={sortedJobs}
         customFields={customFields}
+      />
+
+      <CleanUpModal
+        isOpen={isCleanUpModalOpen}
+        onClose={() => setIsCleanUpModalOpen(false)}
+        jobs={jobs}
+        onDeleteJobs={onDeleteJobs}
+        onDeleteJob={onDeleteJob}
+        statuses={statuses}
       />
     </div>
   );

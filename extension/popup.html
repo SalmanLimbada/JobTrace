@@ -206,6 +206,45 @@
       border: 1px solid rgba(88, 166, 255, 0.35);
       color: #58a6ff;
     }
+    .add-field-btn {
+      background: none;
+      border: none;
+      color: #58a6ff;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 0;
+      transition: color 0.15s;
+    }
+    .add-field-btn:hover {
+      color: #79c0ff;
+      text-decoration: underline;
+    }
+    .custom-field-row {
+      margin-bottom: 8px;
+    }
+    .custom-field-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3px;
+    }
+    .custom-field-header label {
+      margin-bottom: 0;
+    }
+    .custom-field-delete {
+      background: none;
+      border: none;
+      color: #8b949e;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    .custom-field-delete:hover {
+      color: #f85149;
+    }
   </style>
 </head>
 <body>
@@ -255,6 +294,25 @@
     <div class="form-group" id="urlGroup">
       <label for="url">Posting URL</label>
       <input type="text" id="url" placeholder="https://...">
+    </div>
+
+    <!-- Custom Fields Section -->
+    <div class="form-group" id="customFieldsGroup">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <label style="margin-bottom: 0;">Custom Fields</label>
+        <button type="button" id="addFieldToggleBtn" class="add-field-btn">+ Add Field</button>
+      </div>
+
+      <div id="customFieldsContainer"></div>
+
+      <div id="newFieldBox" style="display: none; margin-top: 6px; padding: 6px 8px; background: #161b22; border: 1px dashed #30363d; border-radius: 6px;">
+        <div style="font-size: 10px; color: #8b949e; margin-bottom: 4px;">New Field Name</div>
+        <div style="display: flex; gap: 6px;">
+          <input type="text" id="newFieldNameInput" placeholder="e.g. Referral, Work Type, Tech Stack" style="flex: 1; font-size: 11px; padding: 4px 6px;">
+          <button type="button" id="confirmAddFieldBtn" class="btn btn-primary" style="padding: 4px 10px; font-size: 11px; flex: 0 0 auto;">Add</button>
+          <button type="button" id="cancelAddFieldBtn" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; flex: 0 0 auto;">✕</button>
+        </div>
+      </div>
     </div>
 
     <div class="form-group" id="reqsSection">

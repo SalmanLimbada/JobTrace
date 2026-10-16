@@ -140,7 +140,7 @@ export default function SettingsPage() {
     },
     {
       id: "statuses",
-      label: "Pipeline Statuses",
+      label: "Application Statuses",
       desc: "Application stages and order",
     },
     {
@@ -557,7 +557,7 @@ export default function SettingsPage() {
             {activeSection === "statuses" && (
               <div className="border border-[#30363d] bg-[#161b22] rounded-lg overflow-hidden">
                 <div className="px-5 py-4 border-b border-[#30363d]">
-                  <h2 className="text-sm font-semibold text-[#f0f6fc]">Pipeline Statuses</h2>
+                  <h2 className="text-sm font-semibold text-[#f0f6fc]">Application Statuses</h2>
                   <p className="text-xs text-[#8b949e] mt-0.5">
                     Order and manage the tracking stages used in your dashboard.
                   </p>
