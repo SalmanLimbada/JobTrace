@@ -49,6 +49,61 @@ function getFieldValue(job: JobApplication, fieldId: string): string | undefined
   return undefined;
 }
 
+function getStatusBadgeStyle(status: string): string {
+  switch (status.toLowerCase()) {
+    case "applied":
+      return "bg-[#58a6ff]/15 text-[#58a6ff] border-[#58a6ff]/35 hover:bg-[#58a6ff]/25";
+    case "interview":
+    case "oa / assessment":
+    case "phone screen":
+    case "technical screen":
+    case "behavioral":
+      return "bg-[#d29922]/15 text-[#d29922] border-[#d29922]/35 hover:bg-[#d29922]/25";
+    case "offer":
+      return "bg-[#3fb950]/15 text-[#3fb950] border-[#3fb950]/35 hover:bg-[#3fb950]/25";
+    case "rejected":
+    case "withdrawn":
+      return "bg-[#f85149]/15 text-[#f85149] border-[#f85149]/35 hover:bg-[#f85149]/25";
+    default:
+      return "bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-500";
+  }
+}
+
+function getRowStatusStyle(status: string): { borderClass: string; dimClass: string } {
+  switch (status.toLowerCase()) {
+    case "offer":
+      return {
+        borderClass: "border-l-2 border-l-[#3fb950]",
+        dimClass: "hover:bg-[#3fb950]/5",
+      };
+    case "interview":
+    case "oa / assessment":
+    case "phone screen":
+    case "technical screen":
+    case "behavioral":
+      return {
+        borderClass: "border-l-2 border-l-[#d29922]",
+        dimClass: "hover:bg-[#d29922]/5",
+      };
+    case "applied":
+      return {
+        borderClass: "border-l-2 border-l-[#58a6ff]",
+        dimClass: "hover:bg-[#58a6ff]/5",
+      };
+    case "rejected":
+    case "withdrawn":
+      return {
+        borderClass: "border-l-2 border-l-[#f85149]/40",
+        dimClass: "opacity-65 hover:opacity-100",
+      };
+    default:
+      return {
+        borderClass: "border-l-2 border-l-transparent",
+        dimClass: "",
+      };
+  }
+}
+
 export default function JobTable({
   jobs,
   onStatusChange,
@@ -399,22 +454,24 @@ export default function JobTable({
           </td>
         );
       }
-      case "status":
+      case "status": {
+        const badgeStyle = getStatusBadgeStyle(job.status);
         return (
           <td key={colId} className="p-3">
             <select
               value={job.status}
               onChange={(e) => onStatusChange(job.id, e.target.value as ApplicationStatus)}
-              className="bg-zinc-800 text-zinc-200 text-xs px-2.5 py-1 rounded border border-zinc-700 outline-none cursor-pointer hover:border-zinc-500 transition-colors"
+              className={`text-xs font-medium px-2.5 py-1 rounded-full border outline-none cursor-pointer transition-all duration-150 ${badgeStyle}`}
             >
               {allKnownStatuses.map((s) => (
-                <option key={s} value={s}>
+                <option key={s} value={s} className="bg-zinc-900 text-zinc-200">
                   {s}
                 </option>
               ))}
             </select>
           </td>
         );
+      }
       case "appliedDate":
         return (
           <td key={colId} className="p-3 text-zinc-400 text-xs font-mono">
@@ -712,7 +769,7 @@ export default function JobTable({
       <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/20 shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-zinc-900/90 text-zinc-400 text-xs uppercase font-medium border-b border-zinc-800">
-            <tr>
+            <tr className="border-l-2 border-l-transparent">
               <th className={`${showRowNumbers ? "w-10 px-2" : "w-8 p-0"} text-center font-mono text-[11px]`}>
                 {showRowNumbers ? "#" : ""}
               </th>
@@ -814,11 +871,13 @@ export default function JobTable({
                 </td>
               </tr>
             ) : (
-              sortedJobs.map((job, index) => (
-                <tr
-                  key={job.id}
-                  className="group border-b border-zinc-800/80 hover:bg-zinc-800/30 transition-colors"
-                >
+              sortedJobs.map((job, index) => {
+                const { borderClass, dimClass } = getRowStatusStyle(job.status);
+                return (
+                  <tr
+                    key={job.id}
+                    className={`group border-b border-zinc-800/80 hover:bg-zinc-800/30 transition-all duration-150 ${borderClass} ${dimClass}`}
+                  >
                   {/* Left-edge: Row Number / Hover Slide-Out Pencil */}
                   <td className={`${showRowNumbers ? "w-10 px-2" : "w-8 p-0"} text-center relative select-none`}>
                     {showRowNumbers && (
@@ -852,7 +911,8 @@ export default function JobTable({
 
                   {orderedVisibleColumns.map((colId) => renderCell(job, colId))}
                 </tr>
-              ))
+              );
+            })
             )}
           </tbody>
         </table>
