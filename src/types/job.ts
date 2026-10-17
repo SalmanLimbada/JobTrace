@@ -32,4 +32,5 @@ export interface JobApplication {
   location?: string;
   deadlineDate?: string;
   jobId?: string;
+  createdAt?: string;
 }

@@ -1341,6 +1341,9 @@ async function submitApplication() {
     });
     chrome.storage.local.set({ cachedApplications });
 
+    // Notify any open JobTrace tabs to update immediately without needing a page refresh
+    notifyOpenJobTraceTabs(payload);
+
     statusMsg.textContent = "Saved to your JobTrace dashboard!";
     statusMsg.className = "status-msg success";
     saveBtn.textContent = "Saved!";
@@ -1355,6 +1358,46 @@ async function submitApplication() {
     saveBtn.disabled = false;
     saveBtn.textContent = "Save to JobTrace";
   }
+}
+
+// Broadcast newly clipped application to open JobTrace dashboard tabs
+async function notifyOpenJobTraceTabs(newJob) {
+  try {
+    if (typeof chrome === "undefined" || !chrome.tabs) return;
+    const tabs = await chrome.tabs.query({});
+    for (const t of tabs) {
+      if (!t.id || !t.url) continue;
+      const lower = t.url.toLowerCase();
+      if (
+        lower.includes("localhost") ||
+        lower.includes("127.0.0.1") ||
+        lower.includes("jobtrace") ||
+        lower.includes("job-trace") ||
+        lower.includes("vercel.app")
+      ) {
+        // Message content script
+        try {
+          chrome.tabs.sendMessage(t.id, {
+            type: "JOBTRACE_APPLICATION_ADDED",
+            payload: newJob
+          }).catch(() => {});
+        } catch (e) {}
+
+        // Direct script execution fallback
+        try {
+          chrome.scripting.executeScript({
+            target: { tabId: t.id },
+            func: (job) => {
+              try {
+                window.dispatchEvent(new CustomEvent("jobtrace_application_added", { detail: job }));
+              } catch (e) {}
+            },
+            args: [newJob]
+          }).catch(() => {});
+        } catch (e) {}
+      }
+    }
+  } catch (e) {}
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

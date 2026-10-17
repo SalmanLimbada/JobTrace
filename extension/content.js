@@ -40,4 +40,15 @@
   // Listen for storage events and app events
   window.addEventListener("storage", syncSettings);
   window.addEventListener("jobtrace_settings_updated", syncSettings);
+
+  // Listen for newly added applications from the extension popup
+  if (typeof chrome !== "undefined" && chrome?.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === "JOBTRACE_APPLICATION_ADDED" && msg.payload) {
+        try {
+          window.dispatchEvent(new CustomEvent("jobtrace_application_added", { detail: msg.payload }));
+        } catch (e) {}
+      }
+    });
+  }
 })();

@@ -468,9 +468,28 @@ export default function JobTable({
       if (cmp !== 0) {
         return sortDirection === "asc" ? cmp : -cmp;
       }
+
+      // Tie-breaker when primary sort values are identical:
+      // If primary sort is not appliedDate, tie-break by appliedDate first
+      if (sortColumn !== "appliedDate") {
+        const dateA = a.appliedDate || "";
+        const dateB = b.appliedDate || "";
+        const dateCmp = dateA.localeCompare(dateB, undefined, { numeric: true, sensitivity: "base" });
+        if (dateCmp !== 0) {
+          return sortDirection === "asc" ? dateCmp : -dateCmp;
+        }
+      }
+
+      // Intra-day / same-date tie-breaker: compare createdAt timestamp if available
+      if (a.createdAt && b.createdAt && a.createdAt !== b.createdAt) {
+        const timeCmp = a.createdAt.localeCompare(b.createdAt);
+        return sortDirection === "asc" ? timeCmp : -timeCmp;
+      }
+
+      // Fallback tie-breaker: preserve original array index, respecting direction so newest appears first on desc
       const idxA = indexMap.get(a.id) ?? 0;
       const idxB = indexMap.get(b.id) ?? 0;
-      return idxA - idxB;
+      return sortDirection === "asc" ? idxA - idxB : idxB - idxA;
     });
   }, [filteredJobs, sortColumn, sortDirection]);
 

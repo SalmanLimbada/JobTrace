@@ -183,6 +183,7 @@ export default function Home() {
             jobId: extractedJobId,
             customFields: cleanedCustomFields,
             keyRequirements: parsedRequirements,
+            createdAt: row.created_at || undefined,
           };
         }
         setJobs(map);
@@ -199,6 +200,97 @@ export default function Home() {
       fetchApplications();
     }
   }, [isAuthLoading, fetchApplications]);
+
+  // Real-time sync: listen for applications clipped from Chrome extension or other tabs
+  useEffect(() => {
+    function handleAppAdded(e: Event) {
+      const customEvent = e as CustomEvent<any>;
+      const row = customEvent.detail;
+      if (!row || !row.id) {
+        fetchApplications();
+        return;
+      }
+
+      let parsedRequirements: string[] | undefined = undefined;
+      let cleanedCustomFields: Record<string, string> | undefined = undefined;
+
+      const cf = row.custom_fields && typeof row.custom_fields === "object" ? { ...row.custom_fields } : undefined;
+      if (cf) {
+        if (cf._keyRequirements) {
+          try {
+            parsedRequirements = JSON.parse(cf._keyRequirements);
+          } catch {}
+          delete cf._keyRequirements;
+        }
+        if (cf._highlights) {
+          try {
+            const old = JSON.parse(cf._highlights);
+            if (Array.isArray(old?.requirements)) {
+              parsedRequirements = old.requirements;
+            }
+          } catch {}
+          delete cf._highlights;
+        }
+        if (Object.keys(cf).length > 0) {
+          cleanedCustomFields = cf;
+        }
+      }
+
+      const extractedJobId =
+        row.job_id ||
+        cleanedCustomFields?.jobId ||
+        cleanedCustomFields?.job_id ||
+        extractJobIdFromUrl(row.url) ||
+        undefined;
+
+      const newApp: JobApplication = {
+        id: row.id,
+        userId: row.user_id || user?.id,
+        company: row.company || "",
+        role: row.role || "",
+        status: (row.status as ApplicationStatus) || "Applied",
+        appliedDate: row.applied_date || row.appliedDate || new Date().toISOString().split("T")[0],
+        url: row.url || "#",
+        notes: row.notes || "",
+        salary: row.salary || undefined,
+        location: row.location || undefined,
+        deadlineDate: row.deadline_date || row.deadlineDate || undefined,
+        jobId: extractedJobId,
+        customFields: cleanedCustomFields,
+        keyRequirements: parsedRequirements,
+        createdAt: row.created_at || new Date().toISOString(),
+      };
+
+      setJobs((prev) => {
+        if (prev[row.id]) return prev;
+        return {
+          ...prev,
+          [row.id]: newApp,
+        };
+      });
+
+      // Background re-sync to ensure exact database alignment
+      fetchApplications();
+    }
+
+    window.addEventListener("jobtrace_application_added", handleAppAdded);
+    return () => window.removeEventListener("jobtrace_application_added", handleAppAdded);
+  }, [fetchApplications, user?.id]);
+
+  // Auto-refresh when tab gains focus or becomes visible
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === "visible") {
+        fetchApplications();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleVisibility);
+    };
+  }, [fetchApplications]);
 
   const jobList = Object.values(jobs);
   const totalCount = jobList.length;
@@ -228,6 +320,7 @@ export default function Home() {
       jobId: effectiveJobId,
       customFields: payload.customFields,
       keyRequirements: payload.keyRequirements,
+      createdAt: new Date().toISOString(),
     };
 
     // Update state immediately
