@@ -90,6 +90,16 @@ function cleanUrl(u?: string): string {
 }
 
 /**
+ * Returns YYYY-MM-DD formatted string in the user's local timezone.
+ */
+export function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Formats ISO / YYYY-MM-DD date nicely into [Oct 14, 2026] or [2026-10-14]
  */
 export function formatDateDisplay(dateStr?: string): string {

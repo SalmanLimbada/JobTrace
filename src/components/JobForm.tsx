@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { useSettings } from "@/context/SettingsContext";
 import DatePicker from "@/components/DatePicker";
-import { extractJobIdFromUrl, findDuplicateJob, formatDuplicateMessage } from "@/lib/jobId";
+import { extractJobIdFromUrl, findDuplicateJob, formatDuplicateMessage, getLocalDateString } from "@/lib/jobId";
 import { getStatusOptionClass } from "@/components/JobTable";
 
 export interface NewJobPayload {
@@ -33,7 +33,7 @@ export default function JobForm({ onAddJob, existingJobs }: JobFormProps) {
   const [role, setRole] = useState("");
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState<ApplicationStatus>(statuses[0] || "Applied");
-  const [appliedDate, setAppliedDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [appliedDate, setAppliedDate] = useState(() => getLocalDateString());
   const [notes, setNotes] = useState("");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
 
@@ -78,7 +78,7 @@ export default function JobForm({ onAddJob, existingJobs }: JobFormProps) {
     e.preventDefault();
     if (!company.trim() || !role.trim()) return;
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalDateString();
 
     onAddJob({
       company: company.trim(),

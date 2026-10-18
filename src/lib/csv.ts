@@ -1,4 +1,5 @@
 import type { ApplicationStatus, CustomFieldDefinition, JobApplication } from "@/types/job";
+import { getLocalDateString } from "@/lib/jobId";
 
 function escapeCSV(val: string): string {
   if (val.includes(",") || val.includes('"') || val.includes("\n")) {
@@ -73,7 +74,7 @@ export function exportApplicationsToCSV(
   const link = document.createElement("a");
   const downloadUrl = URL.createObjectURL(blob);
   link.href = downloadUrl;
-  link.download = `job-applications-${new Date().toISOString().split("T")[0]}.csv`;
+  link.download = `job-applications-${getLocalDateString()}.csv`;
   link.click();
   URL.revokeObjectURL(downloadUrl);
 }
@@ -169,7 +170,7 @@ export function exportApplicationsToExcel(
   const downloadUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = downloadUrl;
-  link.download = `job-applications-${new Date().toISOString().split("T")[0]}.xls`;
+  link.download = `job-applications-${getLocalDateString()}.xls`;
   link.click();
   URL.revokeObjectURL(downloadUrl);
 }
@@ -185,14 +186,14 @@ function normalizeStatus(raw: string): ApplicationStatus {
 
 function normalizeDate(raw: string): string {
   const trimmed = raw.trim();
-  if (!trimmed) return new Date().toISOString().split("T")[0];
+  if (!trimmed) return getLocalDateString();
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
 
   const parsed = new Date(trimmed);
   if (!isNaN(parsed.getTime())) {
-    return parsed.toISOString().split("T")[0];
+    return getLocalDateString(parsed);
   }
-  return new Date().toISOString().split("T")[0];
+  return getLocalDateString();
 }
 
 export interface CSVParseResult {
@@ -309,7 +310,7 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
 
     const rawStatus = statusIdx !== -1 ? cols[statusIdx] || "" : "";
     const status: ApplicationStatus = rawStatus ? normalizeStatus(rawStatus) : "Applied";
-    const appliedDate = dateIdx !== -1 ? normalizeDate(cols[dateIdx] || "") : new Date().toISOString().split("T")[0];
+    const appliedDate = dateIdx !== -1 ? normalizeDate(cols[dateIdx] || "") : getLocalDateString();
     const url = (urlIdx !== -1 ? cols[urlIdx] : "") || "#";
     const notes = (notesIdx !== -1 ? cols[notesIdx] : "") || "";
     const salary = (salaryIdx !== -1 ? cols[salaryIdx] : "") || "";

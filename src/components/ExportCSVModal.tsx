@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import type { JobApplication, CustomFieldDefinition } from "@/types/job";
 import { exportApplicationsToCSV, exportApplicationsToExcel } from "@/lib/csv";
+import { getLocalDateString } from "@/lib/jobId";
 
 interface ExportCSVModalProps {
   isOpen: boolean;
@@ -66,8 +67,8 @@ export default function ExportCSVModal({
     const start = new Date();
     start.setDate(end.getDate() - days);
     setDateMode("range");
-    setStartDate(start.toISOString().split("T")[0]);
-    setEndDate(end.toISOString().split("T")[0]);
+    setStartDate(getLocalDateString(start));
+    setEndDate(getLocalDateString(end));
   }
 
   // 1. Base scope selection

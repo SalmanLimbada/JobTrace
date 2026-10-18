@@ -9,7 +9,7 @@ import AuthModal from "@/components/AuthModal";
 import ScrollNav from "@/components/ScrollNav";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
-import { extractJobIdFromUrl } from "@/lib/jobId";
+import { extractJobIdFromUrl, getLocalDateString } from "@/lib/jobId";
 
 const GUEST_STORAGE_KEY = "job_tracker_guest_jobs";
 
@@ -249,7 +249,7 @@ export default function Home() {
         company: row.company || "",
         role: row.role || "",
         status: (row.status as ApplicationStatus) || "Applied",
-        appliedDate: row.applied_date || row.appliedDate || new Date().toISOString().split("T")[0],
+        appliedDate: row.applied_date || row.appliedDate || getLocalDateString(),
         url: row.url || "#",
         notes: row.notes || "",
         salary: row.salary || undefined,
@@ -299,7 +299,7 @@ export default function Home() {
   const rejectedCount = jobList.filter((j) => j.status === "Rejected").length;
 
   async function handleAddJob(payload: NewJobPayload) {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalDateString();
     const newId = crypto.randomUUID();
     const appliedDate = payload.appliedDate || today;
 
