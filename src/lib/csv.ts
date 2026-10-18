@@ -227,7 +227,7 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
   let roleIdx = findIndex(["role", "position", "jobtitle", "title", "job"]);
   let statusIdx = findIndex(["status", "stage", "state", "applicationstatus"]);
   let dateIdx = findIndex(["dateapplied", "applieddate", "applicationdate", "date", "appliedon"]);
-  let urlIdx = findIndex(["postingurl", "joburl", "url", "link", "joblink", "listing"]);
+  let urlIdx = findIndex(["postingurl", "joburl", "url", "link", "joblink", "listing", "applicationsource", "source", "portal"]);
   let notesIdx = findIndex(["notes", "note", "comments", "comment", "description", "details"]);
   let salaryIdx = findIndex(["salary", "compensation", "pay", "rate", "hourly", "annual"]);
   let locationIdx = findIndex(["location", "city", "workplace", "remote", "mode"]);

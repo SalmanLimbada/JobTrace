@@ -560,7 +560,8 @@ export default function Home() {
     }
 
     try {
-      const rowsToInsert = jobArray.map((job) => ({
+      const baseTime = Date.now();
+      const rowsToInsert = jobArray.map((job, idx) => ({
         id: job.id,
         user_id: user.id,
         company: job.company,
@@ -573,6 +574,7 @@ export default function Home() {
         location: job.location || "",
         deadline_date: job.deadlineDate || "",
         custom_fields: job.customFields || {},
+        created_at: new Date(baseTime + idx * 10).toISOString(),
       }));
 
       const CHUNK_SIZE = 500;
