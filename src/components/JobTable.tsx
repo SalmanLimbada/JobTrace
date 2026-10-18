@@ -76,6 +76,26 @@ function getStatusBadgeStyle(status: string): string {
   }
 }
 
+export function getStatusOptionClass(status: string): string {
+  switch (status.toLowerCase()) {
+    case "applied":
+      return "status-option-applied";
+    case "interview":
+    case "oa / assessment":
+    case "phone screen":
+    case "technical screen":
+    case "behavioral":
+      return "status-option-interview";
+    case "offer":
+      return "status-option-offer";
+    case "rejected":
+    case "withdrawn":
+      return "status-option-rejected";
+    default:
+      return "status-option-other";
+  }
+}
+
 function getRowStatusStyle(status: string): { borderClass: string; dimClass: string } {
   switch (status.toLowerCase()) {
     case "offer":
@@ -594,7 +614,7 @@ export default function JobTable({
               className={`status-badge-select text-xs font-medium px-2.5 py-1 rounded-full border outline-none cursor-pointer transition-all duration-150 ${badgeStyle}`}
             >
               {allKnownStatuses.map((s) => (
-                <option key={s} value={s} className="bg-zinc-900 text-zinc-200">
+                <option key={s} value={s} className={`font-medium ${getStatusOptionClass(s)}`}>
                   {s}
                 </option>
               ))}
@@ -758,15 +778,22 @@ export default function JobTable({
               placeholder="Search company, role, job ID (e.g. JR111568), or URL..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 text-sm rounded px-3 py-2 outline-none focus:border-zinc-400"
+              className="w-full bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 text-sm rounded px-3 pr-9 py-2 outline-none focus:border-zinc-400"
             />
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 text-xs cursor-pointer"
+                onClick={() => {
+                  setSearchQuery("");
+                  searchInputRef.current?.focus();
+                }}
+                title="Clear search"
+                aria-label="Clear search"
+                className="search-clear-btn absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-100 bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
               >
-                ✕
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             )}
           </div>
@@ -1133,7 +1160,7 @@ export default function JobTable({
                         )}`}
                       >
                         {allKnownStatuses.map((s) => (
-                          <option key={s} value={s} className="bg-zinc-900 text-zinc-200">
+                          <option key={s} value={s} className={`font-medium ${getStatusOptionClass(s)}`}>
                             {s}
                           </option>
                         ))}

@@ -4,6 +4,7 @@ import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { useSettings } from "@/context/SettingsContext";
 import DatePicker from "@/components/DatePicker";
 import { extractJobIdFromUrl, findDuplicateJob, formatDuplicateMessage } from "@/lib/jobId";
+import { getStatusOptionClass } from "@/components/JobTable";
 
 export interface NewJobPayload {
   company: string;
@@ -165,7 +166,7 @@ export default function JobForm({ onAddJob, existingJobs }: JobFormProps) {
             className="bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors cursor-pointer"
           >
             {statuses.map((s) => (
-              <option key={s} value={s}>
+              <option key={s} value={s} className={`font-medium ${getStatusOptionClass(s)}`}>
                 {s}
               </option>
             ))}

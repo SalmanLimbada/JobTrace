@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import type { JobApplication } from "@/types/job";
 import ConfirmModal from "@/components/ConfirmModal";
+import { getStatusOptionClass } from "@/components/JobTable";
 
 interface CleanUpModalProps {
   isOpen: boolean;
@@ -254,7 +255,7 @@ export default function CleanUpModal({
                 className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] cursor-pointer"
               >
                 {Array.from(new Set([...statuses, "Rejected", "Withdrawn", "Other"])).map((s) => (
-                  <option key={s} value={s}>
+                  <option key={s} value={s} className={`font-medium ${getStatusOptionClass(s)}`}>
                     {s}
                   </option>
                 ))}

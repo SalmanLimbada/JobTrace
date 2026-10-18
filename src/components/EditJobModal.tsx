@@ -6,6 +6,7 @@ import { useSettings } from "@/context/SettingsContext";
 import DatePicker from "@/components/DatePicker";
 import ConfirmModal from "@/components/ConfirmModal";
 import { getEffectiveJobId, formatDateDisplay, findDuplicateJob, formatDuplicateMessage } from "@/lib/jobId";
+import { getStatusOptionClass } from "@/components/JobTable";
 
 interface EditJobModalProps {
   job: JobApplication | null;
@@ -209,7 +210,7 @@ export default function EditJobModal({
                 className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors cursor-pointer"
               >
                 {Array.from(new Set([...statuses, ...(job?.status ? [job.status] : [])])).map((s) => (
-                  <option key={s} value={s}>
+                  <option key={s} value={s} className={`font-medium ${getStatusOptionClass(s)}`}>
                     {s}
                   </option>
                 ))}

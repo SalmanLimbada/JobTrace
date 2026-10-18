@@ -164,8 +164,59 @@ html[data-theme="light"] .status-badge-other:hover {
   background-color: #eaeef2 !important;
 }
 
+/* --- Status Options inside Dropdown Menus --- */
+.status-option-applied {
+  background-color: #161b22 !important;
+  color: #58a6ff !important;
+}
+.status-option-interview {
+  background-color: #161b22 !important;
+  color: #d29922 !important;
+}
+.status-option-offer {
+  background-color: #161b22 !important;
+  color: #3fb950 !important;
+}
+.status-option-rejected {
+  background-color: #161b22 !important;
+  color: #f85149 !important;
+}
+.status-option-other {
+  background-color: #161b22 !important;
+  color: #c9d1d9 !important;
+}
+
+html[data-theme="light"] .status-option-applied {
+  background-color: #ffffff !important;
+  color: #0969da !important;
+}
+html[data-theme="light"] .status-option-interview {
+  background-color: #ffffff !important;
+  color: #9a6700 !important;
+}
+html[data-theme="light"] .status-option-offer {
+  background-color: #ffffff !important;
+  color: #1a7f37 !important;
+}
+html[data-theme="light"] .status-option-rejected {
+  background-color: #ffffff !important;
+  color: #cf222e !important;
+}
+html[data-theme="light"] .status-option-other {
+  background-color: #ffffff !important;
+  color: #57606a !important;
+}
+
 html[data-theme="light"] .status-badge-select option {
   background-color: #ffffff !important;
+}
+
+html[data-theme="light"] .search-clear-btn {
+  background-color: #eaeef2 !important;
+  color: #57606a !important;
+}
+html[data-theme="light"] .search-clear-btn:hover {
+  background-color: #d0d7de !important;
   color: #1f2328 !important;
 }
 
