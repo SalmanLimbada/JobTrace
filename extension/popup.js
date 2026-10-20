@@ -662,6 +662,10 @@ function extractJobIdFromUrl(rawUrl) {
     const qParams = [
       "jobid",
       "job_id",
+      "jobopeningid",
+      "job_opening_id",
+      "postingid",
+      "posting_id",
       "reqid",
       "req_id",
       "requisitionid",
@@ -697,21 +701,72 @@ function cleanStr(s) {
   return (s || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function cleanRole(s) {
+  return (s || "")
+    .replace(/\s*\([^)]*\)/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
 function cleanUrl(u) {
   if (!u || u === "#") return "";
-  return u
-    .trim()
-    .replace(/^https?:\/\/(?:www\.)?/, "")
-    .split("?")[0]
-    .replace(/\/+$/, "");
+  try {
+    const parsed = new URL(u.startsWith("http") ? u : "https://" + u);
+    const trackingParams = new Set([
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_term",
+      "utm_content",
+      "ref",
+      "fbclid",
+      "gclid",
+      "source",
+      "gh_src",
+      "mode",
+      "iis",
+      "iisn",
+    ]);
+    const keysToDelete = [];
+    for (const [key] of parsed.searchParams.entries()) {
+      if (trackingParams.has(key.toLowerCase()) || key.toLowerCase().startsWith("utm_")) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach((k) => parsed.searchParams.delete(k));
+    const search = parsed.searchParams.toString();
+    const hostAndPath = `${parsed.hostname.replace(/^www\./, "")}${parsed.pathname.replace(/\/+$/, "")}`;
+    return search ? `${hostAndPath}?${search}` : hostAndPath;
+  } catch (e) {
+    return u
+      .trim()
+      .replace(/^https?:\/\/(?:www\.)?/, "")
+      .split("?")[0]
+      .replace(/\/+$/, "");
+  }
+}
+
+const MAX_DUPLICATE_DAYS = 90;
+
+function getDaysBetween(dateStr1, dateStr2) {
+  if (!dateStr1 || !dateStr2) return null;
+  const clean1 = String(dateStr1).split("T")[0];
+  const clean2 = String(dateStr2).split("T")[0];
+  const d1 = new Date(clean1).getTime();
+  const d2 = new Date(clean2).getTime();
+  if (isNaN(d1) || isNaN(d2)) return null;
+  return Math.abs(Math.round((d1 - d2) / (1000 * 60 * 60 * 24)));
 }
 
 function getEffectiveJobId(job) {
+  if (!job) return null;
   if (job.jobId && job.jobId.trim()) return job.jobId.trim();
-  if (job.custom_fields) {
-    if (job.custom_fields.jobId && job.custom_fields.jobId.trim()) return job.custom_fields.jobId.trim();
-    if (job.custom_fields.job_id && job.custom_fields.job_id.trim()) return job.custom_fields.job_id.trim();
-    if (job.custom_fields.requisition_id && job.custom_fields.requisition_id.trim()) return job.custom_fields.requisition_id.trim();
+  const cf = job.customFields || job.custom_fields;
+  if (cf) {
+    if (cf.jobId && cf.jobId.trim()) return cf.jobId.trim();
+    if (cf.job_id && cf.job_id.trim()) return cf.job_id.trim();
+    if (cf.requisition_id && cf.requisition_id.trim()) return cf.requisition_id.trim();
   }
   return extractJobIdFromUrl(job.url);
 }
@@ -725,7 +780,7 @@ function getLocalDateString(d = new Date()) {
 
 function formatDateDisplay(dateStr) {
   if (!dateStr) return "Unknown date";
-  const clean = dateStr.split("T")[0];
+  const clean = String(dateStr).split("T")[0];
   const parts = clean.split("-");
   if (parts.length === 3) {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -738,33 +793,66 @@ function formatDateDisplay(dateStr) {
 }
 
 function isDuplicateJob(target, existing) {
+  // 1. Role mismatch check:
+  // If BOTH applications specify a role, and the roles are distinctly different,
+  // they are separate positions and cannot be duplicates.
+  const tRole = cleanRole(target.role);
+  const eRole = cleanRole(existing.role);
+  if (tRole && eRole && tRole !== eRole) {
+    return false;
+  }
+
+  // 2. Date difference check:
+  // Duplicates are only relevant within a recent window (last ~3 months / 90 days).
+  const tDate = target.appliedDate || target.applied_date || getLocalDateString();
+  const eDate = existing.appliedDate || existing.applied_date;
+  if (eDate) {
+    const diffDays = getDaysBetween(tDate, eDate);
+    if (diffDays !== null && diffDays > MAX_DUPLICATE_DAYS) {
+      return false;
+    }
+  }
+
+  const tComp = cleanStr(target.company);
+  const eComp = cleanStr(existing.company);
+
+  if (tComp && eComp && tComp !== eComp && !tComp.includes(eComp) && !eComp.includes(tComp)) {
+    return false;
+  }
+
+  // 3. Direct URL match
   const tUrl = cleanUrl(target.url);
   const eUrl = cleanUrl(existing.url);
   if (tUrl && eUrl && tUrl === eUrl) return true;
 
-  const tId = (target.jobId || extractJobIdFromUrl(target.url) || "").trim().toUpperCase();
+  // 4. Job ID check
+  const tId = (
+    target.jobId ||
+    target.customFields?.jobId ||
+    target.custom_fields?.jobId ||
+    extractJobIdFromUrl(target.url) ||
+    ""
+  ).trim().toUpperCase();
+
   const eId = (getEffectiveJobId(existing) || "").trim().toUpperCase();
 
-  const tComp = cleanStr(target.company);
-  const eComp = cleanStr(existing.company);
-  const tRole = cleanStr(target.role);
-  const eRole = cleanStr(existing.role);
-
-  if (tId && eId && tId === eId) {
-    const isPureDigits = /^\d+$/.test(tId);
-    if (isPureDigits) {
-      const compMatch = tComp && eComp && (tComp.includes(eComp) || eComp.includes(tComp));
-      const roleMatch = tRole && eRole && (tRole.includes(eRole) || eRole.includes(tRole));
-      if (compMatch || roleMatch) return true;
-    } else {
-      if (tComp && eComp && tComp !== eComp && !tComp.includes(eComp) && !eComp.includes(tComp)) {
-        // Different companies
+  if (tId && eId) {
+    if (tId === eId) {
+      const isPureDigits = /^\d+$/.test(tId);
+      if (isPureDigits) {
+        const compMatch = !tComp || !eComp || tComp.includes(eComp) || eComp.includes(tComp);
+        const roleMatch = !tRole || !eRole || tRole === eRole;
+        if (compMatch || roleMatch) return true;
       } else {
         return true;
       }
+    } else {
+      // Both jobs provide distinct Job/Requisition IDs; they represent separate openings
+      return false;
     }
   }
 
+  // 5. Exact Company + Role match
   if (tComp && eComp && tRole && eRole) {
     if (tComp === eComp && tRole === eRole) return true;
   }
@@ -773,6 +861,7 @@ function isDuplicateJob(target, existing) {
 }
 
 function findDuplicateJob(target, existingList) {
+  if (!Array.isArray(existingList)) return null;
   for (const job of existingList) {
     if (isDuplicateJob(target, job)) return job;
   }
@@ -791,10 +880,18 @@ function checkDuplicate() {
 
   if (!duplicateBanner || !duplicateBannerText) return;
 
-  const dup = findDuplicateJob({ company, role, url, jobId }, cachedApplications);
+  const dup = findDuplicateJob(
+    { company, role, url, jobId, appliedDate: getLocalDateString() },
+    cachedApplications
+  );
   if (dup) {
-    const proofDate = formatDateDisplay(dup.applied_date);
-    duplicateBannerText.textContent = `This was already applied to [Applied: ${proofDate}]`;
+    const proofDate = formatDateDisplay(dup.appliedDate || dup.applied_date);
+    const displayId = getEffectiveJobId(dup);
+    if (displayId) {
+      duplicateBannerText.textContent = `This was already applied to (ID: ${displayId}) [Applied: ${proofDate}]`;
+    } else {
+      duplicateBannerText.textContent = `This was already applied to [Applied: ${proofDate}]`;
+    }
     duplicateBanner.style.display = "block";
     if (saveBtn) {
       saveBtn.textContent = "Already Applied — Save Anyway";
@@ -1056,21 +1153,32 @@ async function syncNewFieldToOpenTabs(newField) {
 async function loadSettings() {
   try {
     // 1. Check local extension storage first
-    const stored = await chrome.storage.local.get(["extensionSettings", "userId", "standardColumns", "customFields"]);
+    const stored = await chrome.storage.local.get([
+      "extensionSettings",
+      "userId",
+      "authToken",
+      "standardColumns",
+      "customFields",
+      "cachedApplications",
+    ]);
     if (stored.extensionSettings) {
       extensionSettings = { ...extensionSettings, ...stored.extensionSettings };
     }
     if (stored.userId) {
       currentUserId = stored.userId;
     }
+    let currentAuthToken = stored.authToken || null;
     if (stored.standardColumns) {
       tableStandardColumns = stored.standardColumns;
     }
     if (stored.customFields) {
       tableCustomFields = stored.customFields;
     }
+    if (stored.cachedApplications && Array.isArray(stored.cachedApplications) && stored.cachedApplications.length > 0) {
+      cachedApplications = stored.cachedApplications;
+    }
 
-    // 2. Query open tabs to sync live settings and auth from JobTrace web app
+    // 2. Query open tabs to sync live settings, auth, and applications from JobTrace web app
     const tabs = await chrome.tabs.query({});
     for (const t of tabs) {
       if (
@@ -1089,38 +1197,70 @@ async function loadSettings() {
               const ext = localStorage.getItem("jobtrace_extension_settings");
               const stdCols = localStorage.getItem("jobtrace_standard_columns");
               const customFields = localStorage.getItem("jobtrace_custom_fields_v2");
-              const auth = localStorage.getItem("sb-gphwulqaetaxxmzfurlr-auth-token");
+              const cachedAppsRaw = localStorage.getItem("jobtrace_cached_applications");
+
+              let auth = null;
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+                  auth = localStorage.getItem(key);
+                  break;
+                }
+              }
+              if (!auth) auth = localStorage.getItem("sb-gphwulqaetaxxmzfurlr-auth-token");
+
               let uid = null;
+              let token = null;
               if (auth) {
                 try {
                   const parsed = JSON.parse(auth);
                   uid = parsed?.user?.id || parsed?.id || null;
+                  token = parsed?.access_token || null;
                 } catch (e) {}
               }
+
+              let apps = null;
+              if (cachedAppsRaw) {
+                try { apps = JSON.parse(cachedAppsRaw); } catch (e) {}
+              }
+
               return {
                 settings: ext ? JSON.parse(ext) : null,
                 standardColumns: stdCols ? JSON.parse(stdCols) : null,
                 customFields: customFields ? JSON.parse(customFields) : null,
-                userId: uid
+                cachedApplications: Array.isArray(apps) && apps.length > 0 ? apps : null,
+                userId: uid,
+                authToken: token,
               };
             }
           });
 
-          if (res?.result?.settings) {
-            extensionSettings = { ...extensionSettings, ...res.result.settings };
-            await chrome.storage.local.set({ extensionSettings });
-          }
-          if (res?.result?.standardColumns) {
-            tableStandardColumns = res.result.standardColumns;
-            await chrome.storage.local.set({ standardColumns: tableStandardColumns });
-          }
-          if (res?.result?.customFields) {
-            tableCustomFields = res.result.customFields;
-            await chrome.storage.local.set({ customFields: tableCustomFields });
-          }
-          if (res?.result?.userId) {
-            currentUserId = res.result.userId;
-            await chrome.storage.local.set({ userId: currentUserId });
+          if (res?.result) {
+            const r = res.result;
+            if (r.settings) {
+              extensionSettings = { ...extensionSettings, ...r.settings };
+              chrome.storage.local.set({ extensionSettings });
+            }
+            if (r.standardColumns) {
+              tableStandardColumns = r.standardColumns;
+              chrome.storage.local.set({ standardColumns: tableStandardColumns });
+            }
+            if (r.customFields) {
+              tableCustomFields = r.customFields;
+              chrome.storage.local.set({ customFields: tableCustomFields });
+            }
+            if (r.userId) {
+              currentUserId = r.userId;
+              chrome.storage.local.set({ userId: currentUserId });
+            }
+            if (r.authToken) {
+              currentAuthToken = r.authToken;
+              chrome.storage.local.set({ authToken: currentAuthToken });
+            }
+            if (r.cachedApplications && r.cachedApplications.length > 0) {
+              cachedApplications = r.cachedApplications;
+              chrome.storage.local.set({ cachedApplications });
+            }
           }
         } catch (e) {}
       }
@@ -1162,29 +1302,30 @@ async function loadSettings() {
   }
   renderCustomFields();
 
-  // Load cached applications from storage & Supabase
-  try {
-    const cached = await chrome.storage.local.get(["cachedApplications"]);
-    if (cached?.cachedApplications && Array.isArray(cached.cachedApplications)) {
-      cachedApplications = cached.cachedApplications;
-    }
+  // Load cached applications from Supabase if not already available in cache
+  if (!cachedApplications || cachedApplications.length === 0) {
+    try {
+      const stored = await chrome.storage.local.get(["authToken", "userId"]);
+      const token = stored.authToken || null;
+      const uid = stored.userId || currentUserId;
 
-    let query = `${CONFIG.SUPABASE_URL}/rest/v1/applications?select=id,company,role,applied_date,url,custom_fields`;
-    if (currentUserId) query += `&user_id=eq.${currentUserId}`;
-    const res = await fetch(query, {
-      headers: {
-        "apikey": CONFIG.SUPABASE_ANON_KEY,
-        "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}`,
+      let query = `${CONFIG.SUPABASE_URL}/rest/v1/applications?select=id,company,role,applied_date,url,custom_fields&order=applied_date.desc&limit=1500`;
+      if (uid) query += `&user_id=eq.${uid}`;
+      const res = await fetch(query, {
+        headers: {
+          "apikey": CONFIG.SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${token || CONFIG.SUPABASE_ANON_KEY}`,
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          cachedApplications = data;
+          await chrome.storage.local.set({ cachedApplications });
+        }
       }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        cachedApplications = data;
-        await chrome.storage.local.set({ cachedApplications });
-      }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 }
 
 // Scrape active page and populate form

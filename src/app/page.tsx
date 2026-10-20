@@ -187,6 +187,19 @@ export default function Home() {
           };
         }
         setJobs(map);
+        try {
+          const compact = Object.values(map).map((j) => ({
+            id: j.id,
+            company: j.company,
+            role: j.role,
+            appliedDate: j.appliedDate,
+            url: j.url,
+            jobId: j.jobId,
+            customFields: j.customFields,
+          }));
+          localStorage.setItem("jobtrace_cached_applications", JSON.stringify(compact));
+          window.dispatchEvent(new CustomEvent("jobtrace_settings_updated"));
+        } catch {}
     } catch (err) {
       console.error("Failed to connect to database:", err);
     } finally {

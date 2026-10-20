@@ -20,6 +20,10 @@ export function extractJobIdFromUrl(rawUrl: string | null | undefined): string |
     const qParams = [
       "jobid",
       "job_id",
+      "jobopeningid",
+      "job_opening_id",
+      "postingid",
+      "posting_id",
       "reqid",
       "req_id",
       "requisitionid",
@@ -80,13 +84,73 @@ function cleanStr(s?: string): string {
   return (s || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function cleanUrl(u?: string): string {
-  if (!u || u === "#") return "";
-  return u
+/**
+ * Normalizes role title for comparison by stripping parentheses (remote, intern, etc.)
+ * and removing non-alphanumeric characters.
+ */
+export function cleanRole(s?: string): string {
+  return (s || "")
+    .replace(/\s*\([^)]*\)/g, "")
     .trim()
-    .replace(/^https?:\/\/(?:www\.)?/, "")
-    .split("?")[0]
-    .replace(/\/+$/, "");
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Strips tracking query parameters while preserving structural/job-identifying query parameters.
+ */
+export function cleanUrl(u?: string): string {
+  if (!u || u === "#") return "";
+  try {
+    const parsed = new URL(u.startsWith("http") ? u : `https://${u}`);
+    const trackingParams = new Set([
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_term",
+      "utm_content",
+      "ref",
+      "fbclid",
+      "gclid",
+      "source",
+      "gh_src",
+      "mode",
+      "iis",
+      "iisn",
+    ]);
+    const keysToDelete: string[] = [];
+    for (const [key] of parsed.searchParams.entries()) {
+      if (trackingParams.has(key.toLowerCase()) || key.toLowerCase().startsWith("utm_")) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach((k) => parsed.searchParams.delete(k));
+    const search = parsed.searchParams.toString();
+    const hostAndPath = `${parsed.hostname.replace(/^www\./, "")}${parsed.pathname.replace(/\/+$/, "")}`;
+    return search ? `${hostAndPath}?${search}` : hostAndPath;
+  } catch {
+    return u
+      .trim()
+      .replace(/^https?:\/\/(?:www\.)?/, "")
+      .split("?")[0]
+      .replace(/\/+$/, "");
+  }
+}
+
+/**
+ * Maximum days between applications to be flagged as a duplicate (~3 months).
+ * Applications beyond this window represent different hiring terms or cycles.
+ */
+export const MAX_DUPLICATE_DAYS = 90;
+
+export function getDaysBetween(dateStr1?: string, dateStr2?: string): number | null {
+  if (!dateStr1 || !dateStr2) return null;
+  const clean1 = dateStr1.split("T")[0];
+  const clean2 = dateStr2.split("T")[0];
+  const d1 = new Date(clean1).getTime();
+  const d2 = new Date(clean2).getTime();
+  if (isNaN(d1) || isNaN(d2)) return null;
+  return Math.abs(Math.round((d1 - d2) / (1000 * 60 * 60 * 24)));
 }
 
 /**
@@ -125,44 +189,86 @@ export function isDuplicateJob(
     role?: string;
     url?: string;
     jobId?: string;
+    appliedDate?: string;
+    applied_date?: string;
     customFields?: Record<string, string>;
+    custom_fields?: Record<string, string>;
   },
-  existing: JobApplication
+  existing: JobApplication | {
+    id?: string;
+    company?: string;
+    role?: string;
+    url?: string;
+    appliedDate?: string;
+    applied_date?: string;
+    jobId?: string;
+    customFields?: Record<string, string>;
+    custom_fields?: Record<string, string>;
+  }
 ): boolean {
-  // 1. Direct URL match
+  // 1. Role mismatch check:
+  // If BOTH applications specify a role, and the roles are distinctly different,
+  // they are separate positions and cannot be duplicates.
+  const tRole = cleanRole(target.role);
+  const eRole = cleanRole(existing.role);
+  if (tRole && eRole && tRole !== eRole) {
+    return false;
+  }
+
+  // 2. Date difference check:
+  // Duplicates are only relevant within a recent window (last ~3 months / 90 days).
+  // Applying to a role after several months represents a new hiring cycle or term.
+  const tDate = target.appliedDate || target.applied_date || getLocalDateString();
+  const eDate = existing.appliedDate || (existing as any).applied_date;
+  if (eDate) {
+    const diffDays = getDaysBetween(tDate, eDate);
+    if (diffDays !== null && diffDays > MAX_DUPLICATE_DAYS) {
+      return false;
+    }
+  }
+
+  const tComp = cleanStr(target.company);
+  const eComp = cleanStr(existing.company);
+
+  // If company names are both provided and completely different, cannot be duplicate
+  if (tComp && eComp && tComp !== eComp && !tComp.includes(eComp) && !eComp.includes(tComp)) {
+    return false;
+  }
+
+  // 3. Direct URL match
   const tUrl = cleanUrl(target.url);
   const eUrl = cleanUrl(existing.url);
   if (tUrl && eUrl && tUrl === eUrl) return true;
 
-  // 2. Job ID match
-  const tId = (target.jobId || target.customFields?.jobId || extractJobIdFromUrl(target.url) || "")
-    .trim()
-    .toUpperCase();
+  // 4. Job ID check
+  const tId = (
+    target.jobId ||
+    target.customFields?.jobId ||
+    target.custom_fields?.jobId ||
+    extractJobIdFromUrl(target.url) ||
+    ""
+  ).trim().toUpperCase();
+
   const eId = (getEffectiveJobId(existing) || "").trim().toUpperCase();
 
-  const tComp = cleanStr(target.company);
-  const eComp = cleanStr(existing.company);
-  const tRole = cleanStr(target.role);
-  const eRole = cleanStr(existing.role);
-
-  if (tId && eId && tId === eId) {
-    const isPureDigits = /^\d+$/.test(tId);
-    if (isPureDigits) {
-      // Must be combined with company or role to prevent pure-number collision
-      const compMatch = tComp && eComp && (tComp.includes(eComp) || eComp.includes(tComp));
-      const roleMatch = tRole && eRole && (tRole.includes(eRole) || eRole.includes(tRole));
-      if (compMatch || roleMatch) return true;
-    } else {
-      // Distinct alphanumeric ID (like JR26081665)
-      if (tComp && eComp && tComp !== eComp && !tComp.includes(eComp) && !eComp.includes(tComp)) {
-        // Companies provided and totally different - do not match
+  if (tId && eId) {
+    if (tId === eId) {
+      const isPureDigits = /^\d+$/.test(tId);
+      if (isPureDigits) {
+        // Must have company or role affinity to prevent pure-number collision
+        const compMatch = !tComp || !eComp || tComp.includes(eComp) || eComp.includes(tComp);
+        const roleMatch = !tRole || !eRole || tRole === eRole;
+        if (compMatch || roleMatch) return true;
       } else {
         return true;
       }
+    } else {
+      // Both jobs provide distinct Job/Requisition IDs; they represent separate openings
+      return false;
     }
   }
 
-  // 3. Exact Company + Role match
+  // 5. Exact Company + Role match
   if (tComp && eComp && tRole && eRole) {
     if (tComp === eComp && tRole === eRole) return true;
   }
@@ -179,7 +285,10 @@ export function findDuplicateJob(
     role?: string;
     url?: string;
     jobId?: string;
+    appliedDate?: string;
+    applied_date?: string;
     customFields?: Record<string, string>;
+    custom_fields?: Record<string, string>;
   },
   existingJobs: JobApplication[],
   ignoreId?: string

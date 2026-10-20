@@ -7,12 +7,25 @@
       const ext = localStorage.getItem("jobtrace_extension_settings");
       const stdCols = localStorage.getItem("jobtrace_standard_columns");
       const customFields = localStorage.getItem("jobtrace_custom_fields_v2");
-      const auth = localStorage.getItem("sb-gphwulqaetaxxmzfurlr-auth-token");
+      const cachedAppsRaw = localStorage.getItem("jobtrace_cached_applications");
+
+      let auth = null;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+          auth = localStorage.getItem(key);
+          break;
+        }
+      }
+      if (!auth) auth = localStorage.getItem("sb-gphwulqaetaxxmzfurlr-auth-token");
+
       let uid = null;
+      let token = null;
       if (auth) {
         try {
           const parsed = JSON.parse(auth);
           uid = parsed?.user?.id || parsed?.id || null;
+          token = parsed?.access_token || null;
         } catch (e) {}
       }
 
@@ -26,7 +39,16 @@
       if (customFields) {
         try { payload.customFields = JSON.parse(customFields); } catch (e) {}
       }
+      if (cachedAppsRaw) {
+        try {
+          const parsedApps = JSON.parse(cachedAppsRaw);
+          if (Array.isArray(parsedApps) && parsedApps.length > 0) {
+            payload.cachedApplications = parsedApps;
+          }
+        } catch (e) {}
+      }
       if (uid) payload.userId = uid;
+      if (token) payload.authToken = token;
 
       if (Object.keys(payload).length > 0 && typeof chrome !== "undefined" && chrome?.storage?.local) {
         chrome.storage.local.set(payload);

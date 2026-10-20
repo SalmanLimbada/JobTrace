@@ -68,11 +68,12 @@ export default function JobForm({ onAddJob, existingJobs }: JobFormProps) {
         role,
         url,
         jobId: targetJobId || undefined,
+        appliedDate: standardColumns.appliedDate ? appliedDate : getLocalDateString(),
         customFields: fieldValues,
       },
       existingJobs
     );
-  }, [company, role, url, targetJobId, fieldValues, existingJobs]);
+  }, [company, role, url, targetJobId, appliedDate, standardColumns.appliedDate, fieldValues, existingJobs]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
