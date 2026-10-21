@@ -1054,6 +1054,163 @@ function formatDateDisplay(dateStr) {
   return clean;
 }
 
+const KNOWN_ALIAS_GROUPS = [
+  // Canadian Banks & Financial
+  ["cibc", "canadian imperial bank of commerce", "cibc world markets", "cibc capital markets"],
+  ["rbc", "royal bank of canada", "rbc royal bank", "rbc capital markets"],
+  ["td", "toronto dominion bank", "toronto dominion", "td bank", "td bank group", "td securities"],
+  ["bmo", "bank of montreal", "bmo financial group", "bmo capital markets"],
+  ["scotiabank", "bank of nova scotia", "the bank of nova scotia"],
+  ["nbc", "national bank of canada"],
+  ["manulife", "the manufacturers life insurance company", "manulife financial", "manulife canada"],
+  ["sun life", "sun life financial", "sun life canada"],
+  ["otpp", "ontario teachers pension plan"],
+  ["cppib", "cpp investments", "canada pension plan investment board"],
+
+  // Global Tech, Consulting & Enterprise
+  ["aws", "amazon web services"],
+  ["ibm", "international business machines"],
+  ["ey", "ernst and young", "ernst young"],
+  ["pwc", "pricewaterhousecoopers"],
+  ["kpmg", "kpmg"],
+  ["deloitte", "deloitte touche tohmatsu"],
+  ["hpe", "hewlett packard enterprise"],
+  ["hp", "hewlett packard"],
+  ["meta", "facebook"],
+  ["alphabet", "google"],
+  ["sap", "sap se"],
+];
+
+function cleanCompanyForMatch(name) {
+  if (!name || typeof name !== "string") return "";
+  return name
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/['’]/g, "")
+    .replace(/[&]/g, " and ")
+    .replace(
+      /\b(inc|incorporated|corp|corporation|llc|ltd|limited|co|company|technologies|technology|tech|group|holdings|services|recruiting|recruitment|talent|solutions|careers|canada|usa|global|international|us|ca|bank)\b/gi,
+      " "
+    )
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getCompanyInitials(name) {
+  if (!name || typeof name !== "string") return "";
+  const STOP_WORDS = new Set(["of", "and", "the", "for", "in", "a", "an", "&"]);
+  const words = name
+    .replace(/[-/]/g, " ")
+    .replace(/[^a-zA-Z0-9\s]/g, "")
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0 && !STOP_WORDS.has(w.toLowerCase()));
+  if (words.length <= 1) return "";
+  return words.map((w) => w[0]).join("").toLowerCase();
+}
+
+function matchesAliasGroup(name, group) {
+  const c = cleanCompanyForMatch(name);
+  const initials = getCompanyInitials(name);
+  for (const alias of group) {
+    const aClean = cleanCompanyForMatch(alias);
+    if (!aClean) continue;
+    if (c === aClean || (initials && initials === aClean)) return true;
+    if (aClean.length >= 3 && (c.startsWith(aClean + " ") || aClean.startsWith(c + " "))) return true;
+  }
+  return false;
+}
+
+function areKnownAliases(name1, name2) {
+  if (!name1 || !name2) return false;
+  for (const group of KNOWN_ALIAS_GROUPS) {
+    if (matchesAliasGroup(name1, group) && matchesAliasGroup(name2, group)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function findBestMatchingCompany(scrapedCompany, existingApplications = []) {
+  if (!scrapedCompany || typeof scrapedCompany !== "string") return "";
+  const rawScraped = scrapedCompany.trim();
+  if (!rawScraped || !Array.isArray(existingApplications) || existingApplications.length === 0) {
+    return rawScraped;
+  }
+
+  const companyMap = new Map();
+  existingApplications.forEach((app, idx) => {
+    const raw = (app.company || "").trim();
+    if (!raw) return;
+    const existing = companyMap.get(raw);
+    if (existing) {
+      existing.count++;
+    } else {
+      companyMap.set(raw, { name: raw, count: 1, latestIndex: idx });
+    }
+  });
+
+  if (companyMap.size === 0) return rawScraped;
+
+  const scrapedClean = cleanCompanyForMatch(rawScraped);
+  const scrapedInitials = getCompanyInitials(rawScraped);
+  const parensMatch = rawScraped.match(/\(([^)]+)\)/);
+  const scrapedParensText = parensMatch ? cleanCompanyForMatch(parensMatch[1]) : "";
+
+  const candidates = [];
+
+  for (const entry of companyMap.values()) {
+    const existingRaw = entry.name;
+    const existingLower = existingRaw.toLowerCase();
+    const existingClean = cleanCompanyForMatch(existingRaw);
+    const existingInitials = getCompanyInitials(existingRaw);
+
+    let score = 0;
+
+    if (existingLower === rawScraped.toLowerCase()) {
+      score = 1000;
+    } else if (existingClean && scrapedClean && existingClean === scrapedClean) {
+      score = 800;
+    } else if (
+      (scrapedInitials && existingClean && scrapedInitials === existingClean) ||
+      (existingInitials && scrapedClean && existingInitials === scrapedClean) ||
+      (scrapedParensText && existingClean && scrapedParensText === existingClean) ||
+      (scrapedParensText && existingInitials && scrapedParensText === existingInitials)
+    ) {
+      score = 600;
+    } else if (areKnownAliases(rawScraped, existingRaw)) {
+      score = 500;
+    } else if (
+      scrapedClean.length >= 3 &&
+      existingClean.length >= 3 &&
+      (scrapedClean.startsWith(existingClean + " ") || existingClean.startsWith(scrapedClean + " "))
+    ) {
+      score = 300;
+    }
+
+    if (score >= 300) {
+      candidates.push({
+        name: entry.name,
+        score,
+        count: entry.count,
+        latestIndex: entry.latestIndex,
+      });
+    }
+  }
+
+  if (candidates.length === 0) {
+    return rawScraped;
+  }
+
+  candidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.count !== a.count) return b.count - a.count;
+    return a.latestIndex - b.latestIndex;
+  });
+
+  return candidates[0].name;
+}
+
 function isDuplicateJob(target, existing) {
   // 1. Role mismatch check:
   // If BOTH applications specify a role, and the roles are distinctly different,
@@ -1078,7 +1235,15 @@ function isDuplicateJob(target, existing) {
   const tComp = cleanStr(target.company);
   const eComp = cleanStr(existing.company);
 
-  if (tComp && eComp && tComp !== eComp && !tComp.includes(eComp) && !eComp.includes(tComp)) {
+  if (
+    tComp &&
+    eComp &&
+    tComp !== eComp &&
+    !tComp.includes(eComp) &&
+    !eComp.includes(tComp) &&
+    cleanCompanyForMatch(target.company) !== cleanCompanyForMatch(existing.company) &&
+    !areKnownAliases(target.company, existing.company)
+  ) {
     return false;
   }
 
@@ -1657,6 +1822,10 @@ async function captureActiveTab() {
         let s = wdMatch[1].replace(/[-_]/g, " ").replace(/\b(careers?|jobs?)\b/gi, "").trim();
         companyVal = s.replace(/\b[a-z]/g, (c) => c.toUpperCase());
       }
+    }
+
+    if (companyVal) {
+      companyVal = findBestMatchingCompany(companyVal, cachedApplications);
     }
 
     if (companyInput && companyVal) companyInput.value = companyVal;

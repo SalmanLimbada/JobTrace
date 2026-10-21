@@ -1,5 +1,208 @@
 import type { JobApplication } from "@/types/job";
 
+export const KNOWN_ALIAS_GROUPS: string[][] = [
+  // Canadian Banks & Financial
+  ["cibc", "canadian imperial bank of commerce", "cibc world markets", "cibc capital markets"],
+  ["rbc", "royal bank of canada", "rbc royal bank", "rbc capital markets"],
+  ["td", "toronto dominion bank", "toronto dominion", "td bank", "td bank group", "td securities"],
+  ["bmo", "bank of montreal", "bmo financial group", "bmo capital markets"],
+  ["scotiabank", "bank of nova scotia", "the bank of nova scotia"],
+  ["nbc", "national bank of canada"],
+  ["manulife", "the manufacturers life insurance company", "manulife financial", "manulife canada"],
+  ["sun life", "sun life financial", "sun life canada"],
+  ["otpp", "ontario teachers pension plan"],
+  ["cppib", "cpp investments", "canada pension plan investment board"],
+
+  // Global Tech, Consulting & Enterprise
+  ["aws", "amazon web services"],
+  ["ibm", "international business machines"],
+  ["ey", "ernst and young", "ernst young"],
+  ["pwc", "pricewaterhousecoopers"],
+  ["kpmg", "kpmg"],
+  ["deloitte", "deloitte touche tohmatsu"],
+  ["hpe", "hewlett packard enterprise"],
+  ["hp", "hewlett packard"],
+  ["meta", "facebook"],
+  ["alphabet", "google"],
+  ["sap", "sap se"],
+];
+
+/**
+ * Normalizes a company name for fuzzy matching by removing common legal fluff,
+ * recruiting/staffing noise, technology tags, and punctuation.
+ */
+export function cleanCompanyForMatch(name?: string): string {
+  if (!name || typeof name !== "string") return "";
+  return name
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/['’]/g, "")
+    .replace(/[&]/g, " and ")
+    .replace(
+      /\b(inc|incorporated|corp|corporation|llc|ltd|limited|co|company|technologies|technology|tech|group|holdings|services|recruiting|recruitment|talent|solutions|careers|canada|usa|global|international|us|ca|bank)\b/gi,
+      " "
+    )
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Computes the acronym/initials of a company name (ignoring common minor filler words).
+ * e.g. "Canadian Imperial Bank of Commerce" -> "cibc"
+ * e.g. "Royal Bank of Canada" -> "rbc"
+ */
+export function getCompanyInitials(name?: string): string {
+  if (!name || typeof name !== "string") return "";
+  const STOP_WORDS = new Set(["of", "and", "the", "for", "in", "a", "an", "&"]);
+  const words = name
+    .replace(/[-/]/g, " ")
+    .replace(/[^a-zA-Z0-9\s]/g, "")
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0 && !STOP_WORDS.has(w.toLowerCase()));
+  if (words.length <= 1) return "";
+  return words.map((w) => w[0]).join("").toLowerCase();
+}
+
+function matchesAliasGroup(name: string, group: string[]): boolean {
+  const c = cleanCompanyForMatch(name);
+  const initials = getCompanyInitials(name);
+  for (const alias of group) {
+    const aClean = cleanCompanyForMatch(alias);
+    if (!aClean) continue;
+    if (c === aClean || (initials && initials === aClean)) return true;
+    if (aClean.length >= 3 && (c.startsWith(aClean + " ") || aClean.startsWith(c + " "))) return true;
+  }
+  return false;
+}
+
+/**
+ * Checks if two company names belong to the same known alias group.
+ */
+export function areKnownAliases(name1?: string, name2?: string): boolean {
+  if (!name1 || !name2) return false;
+  for (const group of KNOWN_ALIAS_GROUPS) {
+    if (matchesAliasGroup(name1, group) && matchesAliasGroup(name2, group)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+interface ExistingCompanyEntry {
+  name: string;
+  count: number;
+  latestIndex: number;
+}
+
+/**
+ * Finds the best matching company name from the user's past application history.
+ * If a past match is found (by exact name, stripped legal/recruiting fluff, acronym, or enterprise alias),
+ * returns the user's preferred existing formatting.
+ * If no match is found (first-time company), returns the scraped company as-is.
+ */
+export function findBestMatchingCompany(
+  scrapedCompany?: string,
+  existingApplications: Array<{ company?: string }> = []
+): string {
+  if (!scrapedCompany || typeof scrapedCompany !== "string") return "";
+  const rawScraped = scrapedCompany.trim();
+  if (!rawScraped || !Array.isArray(existingApplications) || existingApplications.length === 0) {
+    return rawScraped;
+  }
+
+  // Aggregate user's past companies by frequency and recency
+  const companyMap = new Map<string, ExistingCompanyEntry>();
+  existingApplications.forEach((app, idx) => {
+    const raw = (app.company || "").trim();
+    if (!raw) return;
+    const existing = companyMap.get(raw);
+    if (existing) {
+      existing.count++;
+    } else {
+      companyMap.set(raw, { name: raw, count: 1, latestIndex: idx });
+    }
+  });
+
+  if (companyMap.size === 0) return rawScraped;
+
+  const scrapedClean = cleanCompanyForMatch(rawScraped);
+  const scrapedInitials = getCompanyInitials(rawScraped);
+
+  // Check for acronym in parentheses e.g. "Canadian Imperial Bank of Commerce (CIBC)"
+  const parensMatch = rawScraped.match(/\(([^)]+)\)/);
+  const scrapedParensText = parensMatch ? cleanCompanyForMatch(parensMatch[1]) : "";
+
+  interface CandidateMatch {
+    name: string;
+    score: number;
+    count: number;
+    latestIndex: number;
+  }
+
+  const candidates: CandidateMatch[] = [];
+
+  for (const entry of companyMap.values()) {
+    const existingRaw = entry.name;
+    const existingLower = existingRaw.toLowerCase();
+    const existingClean = cleanCompanyForMatch(existingRaw);
+    const existingInitials = getCompanyInitials(existingRaw);
+
+    let score = 0;
+
+    // 1. Exact case-insensitive match
+    if (existingLower === rawScraped.toLowerCase()) {
+      score = 1000;
+    }
+    // 2. Clean match without legal/recruiting/corporate fluff (e.g. "Example Ltd" vs "Example")
+    else if (existingClean && scrapedClean && existingClean === scrapedClean) {
+      score = 800;
+    }
+    // 3. Initials / Acronym match (e.g. "Canadian Imperial Bank of Commerce" vs "CIBC")
+    else if (
+      (scrapedInitials && existingClean && scrapedInitials === existingClean) ||
+      (existingInitials && scrapedClean && existingInitials === scrapedClean) ||
+      (scrapedParensText && existingClean && scrapedParensText === existingClean) ||
+      (scrapedParensText && existingInitials && scrapedParensText === existingInitials)
+    ) {
+      score = 600;
+    }
+    // 4. Known enterprise aliases
+    else if (areKnownAliases(rawScraped, existingRaw)) {
+      score = 500;
+    }
+    // 5. Whole-word prefix match for sub-brands (e.g. "Example Digital" vs "Example")
+    else if (
+      (scrapedClean.length >= 3 && existingClean.length >= 3) &&
+      (scrapedClean.startsWith(existingClean + " ") || existingClean.startsWith(scrapedClean + " "))
+    ) {
+      score = 300;
+    }
+
+    if (score >= 300) {
+      candidates.push({
+        name: entry.name,
+        score,
+        count: entry.count,
+        latestIndex: entry.latestIndex,
+      });
+    }
+  }
+
+  if (candidates.length === 0) {
+    return rawScraped;
+  }
+
+  // Sort by score (desc), then frequency (desc), then recency (latestIndex asc)
+  candidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.count !== a.count) return b.count - a.count;
+    return a.latestIndex - b.latestIndex;
+  });
+
+  return candidates[0].name;
+}
+
 /**
  * Extracts a Requisition or Job ID from a job posting URL.
  * Supports Workday (e.g. JR26081665, R-12345), Greenhouse, Lever,
@@ -235,7 +438,15 @@ export function isDuplicateJob(
   const eComp = cleanStr(existing.company);
 
   // If company names are both provided and completely different, cannot be duplicate
-  if (tComp && eComp && tComp !== eComp && !tComp.includes(eComp) && !eComp.includes(tComp)) {
+  if (
+    tComp &&
+    eComp &&
+    tComp !== eComp &&
+    !tComp.includes(eComp) &&
+    !eComp.includes(tComp) &&
+    cleanCompanyForMatch(target.company) !== cleanCompanyForMatch(existing.company) &&
+    !areKnownAliases(target.company, existing.company)
+  ) {
     return false;
   }
 

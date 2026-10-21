@@ -193,6 +193,48 @@ assert.equal(
   true
 );
 
+// Scenario 6: CIBC vs Canadian Imperial Bank of Commerce (shorthand vs full name duplicate detection)
+assert.equal(
+  isDuplicateJob(
+    {
+      company: "Canadian Imperial Bank of Commerce",
+      role: "AI Engineer",
+      appliedDate: "2026-10-20",
+      jobId: "10928",
+    },
+    {
+      id: "cibc-1",
+      company: "CIBC",
+      role: "AI Engineer",
+      appliedDate: "2026-10-15",
+      jobId: "10928",
+      status: "Applied",
+    }
+  ),
+  true
+);
+
+// Scenario 7: Example Recruiting vs Example (corporate noise duplicate detection)
+assert.equal(
+  isDuplicateJob(
+    {
+      company: "Example Recruiting",
+      role: "Backend Developer",
+      url: "https://example.com/apply/456",
+      appliedDate: "2026-10-20",
+    },
+    {
+      id: "ex-1",
+      company: "Example",
+      role: "Backend Developer",
+      url: "https://example.com/apply/456",
+      appliedDate: "2026-10-10",
+      status: "Applied",
+    }
+  ),
+  true
+);
+
 // 4. Duplicate message formatting
 const msg = formatDuplicateMessage(existingApp, "JR26081665");
 assert.equal(msg.includes("JR26081665"), true);
