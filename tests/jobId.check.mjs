@@ -32,6 +32,10 @@ assert.equal(
   extractJobIdFromUrl("https://careers.peelpolice.ca/psc/HR92RECP/EMPLOYEE/HRMS/c/HRS_HRAM_FL.HRS_CG_SEARCH_FL.GBL?JobOpeningId=10283"),
   "10283"
 );
+assert.equal(
+  extractJobIdFromUrl("https://www.fitzii.com/apply/100927?s=li"),
+  "100927"
+);
 
 // 2. Effective Job ID tests
 assert.equal(

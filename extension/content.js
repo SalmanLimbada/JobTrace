@@ -30,9 +30,6 @@
       }
 
       const payload = {};
-      if (ext) {
-        try { payload.extensionSettings = JSON.parse(ext); } catch (e) {}
-      }
       if (stdCols) {
         try { payload.standardColumns = JSON.parse(stdCols); } catch (e) {}
       }
@@ -50,8 +47,23 @@
       if (uid) payload.userId = uid;
       if (token) payload.authToken = token;
 
-      if (Object.keys(payload).length > 0 && typeof chrome !== "undefined" && chrome?.storage?.local) {
-        chrome.storage.local.set(payload);
+      if (typeof chrome !== "undefined" && chrome?.storage?.local) {
+        // Sync extensionSettings safely: do not overwrite user's custom preference in extension storage
+        chrome.storage.local.get(["extensionSettings"], (stored) => {
+          if (stored?.extensionSettings) {
+            try {
+              localStorage.setItem("jobtrace_extension_settings", JSON.stringify(stored.extensionSettings));
+            } catch (e) {}
+          } else if (ext) {
+            try {
+              payload.extensionSettings = JSON.parse(ext);
+            } catch (e) {}
+          }
+
+          if (Object.keys(payload).length > 0) {
+            chrome.storage.local.set(payload);
+          }
+        });
       }
     } catch (e) {}
   }

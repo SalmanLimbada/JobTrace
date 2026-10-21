@@ -37,32 +37,166 @@ function scrapePageDetails() {
       if (!title || typeof title !== "string") return "";
       let t = decodeHTMLEntities(title);
       t = t.replace(/^[\s•–—\-:|]+|[\s•–—\-:|]+$/g, "").trim();
+      t = t.replace(/\bCo\s*-\s*op\b/gi, "Co-op");
       return t;
     }
 
-    const JUNK_COMPANY_EXACT = /^(careers?|jobs?|apply|apply now|job search|search|search for jobs|browse jobs|find jobs|view jobs|all jobs|current openings|open positions|welcome|candidate home|candidate portal|portal|dashboard|join us|work with us|job opportunities|opportunities|workday|logo|company logo|myworkdayjobs|home|back|back to search|back to jobs|sign in|log in|login|thank you|confirmation|menu|navigation|main navigation|header|footer|banner|button|submit|overview|introduce yourself|saved jobs|job alerts)$/i;
+    function hasBalancedParens(str) {
+      if (!str || typeof str !== "string") return true;
+      let round = 0;
+      let square = 0;
+      for (let i = 0; i < str.length; i++) {
+        const ch = str[i];
+        if (ch === '(') round++;
+        else if (ch === ')') {
+          round--;
+          if (round < 0) return false;
+        } else if (ch === '[') square++;
+        else if (ch === ']') {
+          square--;
+          if (square < 0) return false;
+        }
+      }
+      return round === 0 && square === 0;
+    }
+
+    const JUNK_COMPANY_EXACT = /^(careers?|jobs?|apply|apply now|job search|search|search for jobs|browse jobs|find jobs|view jobs|all jobs|current openings|open positions|welcome|candidate home|candidate portal|portal|dashboard|join us|work with us|job opportunities|opportunities|workday|logo|company logo|myworkdayjobs|home|back|back to search|back to jobs|sign in|log in|login|thank you|confirmation|menu|navigation|main navigation|header|footer|banner|button|submit|overview|introduce yourself|saved jobs|job alerts|fitzii)$/i;
 
     const JUNK_COMPANY_PHRASE = /\b(search(?:\s+for)?\s+jobs?|job\s+search|find\s+(?:a\s+)?jobs?|browse\s+(?:all\s+)?jobs?|current\s+openings|career\s+opportunities|candidate\s+home|candidate\s+portal|sign\s+in|log\s+in|introduce\s+yourself|navigation\s+menu|back\s+to\s+search|view\s+all\s+jobs|explore\s+careers|join\s+our\s+talent|talent\s+community)\b/i;
+
+    const PURE_ROLE_OR_WORK_WORDS = /^(co-?op|intern|internship|full-?time|part-?time|contract|temporary|remote|hybrid|on-?site|entry\s+level|new\s+grad|junior|senior|lead|staff|principal|software\s+engineer|developer|product\s+manager|data\s+scientist|designer|analyst|specialist|coordinator|assistant|associate|technician|administrator|manager|director)\b/i;
 
     function isValidCompany(name) {
       if (!name || typeof name !== "string") return false;
       const t = decodeHTMLEntities(name).trim();
       if (t.length < 2 || t.length > 70) return false;
+      if (!hasBalancedParens(t)) return false;
+      if (/^[/\\]|[/\\&,]$/.test(t)) return false;
       if (JUNK_COMPANY_EXACT.test(t)) return false;
       if (JUNK_COMPANY_PHRASE.test(t)) return false;
-      if (/^(search|browse|find|apply|sign\s+in|log\s+in|back\s+to)\b/i.test(t)) return false;
+      if (PURE_ROLE_OR_WORK_WORDS.test(t)) return false;
+      if (/^(search|browse|find|apply|sign\s+in|log\s+in|back\s+to|op\s*\/)\b/i.test(t)) return false;
       return true;
     }
 
-    const JUNK_ROLE_REGEX = /^(thank you|thanks|application (?:submitted|received|status|confirmation)|applied|congratulations|success|candidate (?:home|portal|profile)|careers?|home|sign in|login|welcome|dashboard|confirm(?:ation)?|search(?:\s+for)?\s+jobs?|browse\s+jobs?)$/i;
+    const JUNK_ROLE_REGEX = /^(thank you|thanks|application (?:submitted|received|status|confirmation)|job application|job opening|apply|apply now|applied|congratulations|success|candidate (?:home|portal|profile)|careers?|home|sign in|login|welcome|dashboard|confirm(?:ation)?|search(?:\s+for)?\s+jobs?|browse\s+jobs?|job description|job details)$/i;
 
     function isValidRole(title) {
       if (!title || typeof title !== "string") return false;
       const t = cleanRoleTitle(title);
       if (t.length < 2 || t.length > 120) return false;
+      if (!hasBalancedParens(t)) return false;
       if (JUNK_ROLE_REGEX.test(t)) return false;
       if (/^(search(?:\s+for)?\s+jobs?|sign\s+in|log\s+in|candidate\s+home)$/i.test(t)) return false;
       return true;
+    }
+
+    function splitByCharRespectingParens(str, targetChar) {
+      const parts = [];
+      let cur = '';
+      let depth = 0;
+      for (let i = 0; i < str.length; i++) {
+        const ch = str[i];
+        if (ch === '(' || ch === '[') depth++;
+        else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
+        if (depth === 0 && ch === targetChar) {
+          if (cur.trim()) parts.push(cur.trim());
+          cur = '';
+          continue;
+        }
+        cur += ch;
+      }
+      if (cur.trim()) parts.push(cur.trim());
+      return parts;
+    }
+
+    function splitByDashesRespectingParens(str) {
+      const parts = [];
+      let cur = '';
+      let depth = 0;
+      for (let i = 0; i < str.length; i++) {
+        const ch = str[i];
+        if (ch === '(' || ch === '[') depth++;
+        else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
+        if (depth === 0 && (ch === '-' || ch === '–' || ch === '—') && i > 0 && i < str.length - 1 && /\s/.test(str[i-1]) && /\s/.test(str[i+1])) {
+          cur = cur.trimEnd();
+          if (cur) parts.push(cur);
+          cur = '';
+          while (i + 1 < str.length && /\s/.test(str[i+1])) i++;
+          continue;
+        }
+        cur += ch;
+      }
+      if (cur.trim()) parts.push(cur.trim());
+      return parts;
+    }
+
+    function splitOnTopDelimiter(str) {
+      for (const delim of ['|', '•', '·']) {
+        if (str.includes(delim)) {
+          const parts = splitByCharRespectingParens(str, delim);
+          if (parts.length >= 2) return parts;
+        }
+      }
+      const atMatch = str.match(/^(.+?)\s+(?:at|@)\s+([A-Za-z0-9&.,'’\s-]+)$/i);
+      if (atMatch) return [atMatch[1], atMatch[2]];
+
+      return splitByDashesRespectingParens(str);
+    }
+
+    function parseTitleForRoleAndCompany(title) {
+      if (!title) return { role: "", company: "" };
+      let t = decodeHTMLEntities(title).trim();
+      t = t.replace(/\s*[-–—|•·]\s*(?:LinkedIn|Indeed|Glassdoor|Greenhouse|Lever|Ashby|Workday|SmartRecruiters|Fitzii|BambooHR|Workable|ZipRecruiter|Jobs|Careers).*$/i, "");
+
+      const atMatch = t.match(/^(.+?)\s+(?:at|@)\s+([A-Za-z0-9&.,'’\s-]+)$/i);
+      if (atMatch) {
+        const rCand = cleanRoleTitle(atMatch[1]);
+        const cCand = atMatch[2].trim();
+        if (isValidRole(rCand) && isValidCompany(cCand)) return { role: rCand, company: cCand };
+      }
+
+      const parts = splitOnTopDelimiter(t);
+      if (parts.length <= 1) {
+        const single = cleanRoleTitle(parts[0] || t);
+        return { role: isValidRole(single) ? single : "", company: "" };
+      }
+
+      const ROLE_KW = /\b(engineer|developer|intern|internship|co-?op|student|architect|designer|manager|director|analyst|specialist|scientist|lead|consultant|technician|administrator|officer|assistant|coordinator|associate|fellow|apprentice|vp|head\s+of|representative|recruiter|accountant|executive)\b/i;
+      const validParts = parts.filter(p => p.length >= 2 && hasBalancedParens(p));
+
+      let roleCandidate = "";
+      let compCandidate = "";
+
+      for (const part of validParts) {
+        if (!roleCandidate && isValidRole(part) && ROLE_KW.test(part)) {
+          roleCandidate = cleanRoleTitle(part);
+          break;
+        }
+      }
+
+      for (const part of validParts) {
+        if (part === roleCandidate) continue;
+        if (!compCandidate && isValidCompany(part) && !ROLE_KW.test(part)) {
+          compCandidate = part;
+          break;
+        }
+      }
+
+      if (!roleCandidate && validParts.length >= 1 && isValidRole(validParts[0])) {
+        roleCandidate = cleanRoleTitle(validParts[0]);
+      }
+      if (!compCandidate) {
+        for (let i = validParts.length - 1; i >= 0; i--) {
+          const part = validParts[i];
+          if (part !== roleCandidate && isValidCompany(part)) {
+            compCandidate = part;
+            break;
+          }
+        }
+      }
+
+      return { role: roleCandidate, company: compCandidate };
     }
 
     let initialUrl = window.location.href;
@@ -89,16 +223,22 @@ function scrapePageDetails() {
       keyRequirements: []
     };
 
+    function isJobPostingType(t) {
+      if (!t) return false;
+      if (Array.isArray(t)) return t.some(isJobPostingType);
+      return String(t).toLowerCase().includes("jobposting");
+    }
+
     // 1. Schema.org JSON-LD
     try {
       const scripts = document.querySelectorAll('script[type="application/ld+json"]');
       for (const s of scripts) {
         try {
           let json = JSON.parse(s.textContent || "{}");
-          if (Array.isArray(json)) json = json.find(j => j && j["@type"] === "JobPosting") || json[0];
-          if (json && json["@graph"]) json = json["@graph"].find(j => j && j["@type"] === "JobPosting") || json;
+          if (Array.isArray(json)) json = json.find(j => j && isJobPostingType(j["@type"])) || json[0];
+          if (json && json["@graph"]) json = json["@graph"].find(j => j && isJobPostingType(j["@type"])) || json;
 
-          if (json && (json["@type"] === "JobPosting" || json.title || json.hiringOrganization)) {
+          if (json && (isJobPostingType(json["@type"]) || json.title || json.hiringOrganization)) {
             if (json.title && !result.role) {
               const cleanTitle = cleanRoleTitle(json.title);
               if (isValidRole(cleanTitle)) result.role = cleanTitle;
@@ -146,6 +286,20 @@ function scrapePageDetails() {
             }
           }
         } catch (e) {}
+      }
+    } catch (e) {}
+
+    // 1.5 OpenGraph & Meta tags
+    try {
+      if (!result.company) {
+        const ogSite = document.querySelector("meta[property='og:site_name'], meta[name='application-name']")?.getAttribute("content");
+        if (ogSite && isValidCompany(ogSite)) result.company = decodeHTMLEntities(ogSite);
+      }
+      const ogTitle = document.querySelector("meta[property='og:title'], meta[name='twitter:title']")?.getAttribute("content");
+      if (ogTitle && (!result.role || !result.company)) {
+        const parsed = parseTitleForRoleAndCompany(ogTitle);
+        if (!result.role && parsed.role && isValidRole(parsed.role)) result.role = parsed.role;
+        if (!result.company && parsed.company && isValidCompany(parsed.company)) result.company = parsed.company;
       }
     } catch (e) {}
 
@@ -314,6 +468,100 @@ function scrapePageDetails() {
         const c = m[1].replace(/[-_]/g, " ").replace(/\b[a-z]/g, ch => ch.toUpperCase());
         if (isValidCompany(c)) result.company = c;
       }
+    } else if (host.includes("fitzii.com")) {
+      const allP = Array.from(document.querySelectorAll("p, div, h2, h3, h4, span, label"));
+      const applyForEl = allP.find(el => /you\s+(?:are|'re)?\s+applying\s+for/i.test(el.textContent));
+      if (applyForEl) {
+        let container = applyForEl.nextElementSibling;
+        while (container && container.tagName === "BR") container = container.nextElementSibling;
+        if (container) {
+          const items = Array.from(container.querySelectorAll("p, div, span"))
+            .map(el => decodeHTMLEntities(el.textContent).trim())
+            .filter(Boolean);
+          if (items.length >= 1 && !result.role && isValidRole(items[0])) result.role = cleanRoleTitle(items[0]);
+          if (items.length >= 2 && !result.company && isValidCompany(items[1])) result.company = items[1];
+          if (items.length >= 3 && !result.location) result.location = items[2];
+        }
+      }
+      const fitziiIdMatch = window.location.pathname.match(/\/apply\/(\d+)/i);
+      if (fitziiIdMatch && !result.jobId) result.jobId = fitziiIdMatch[1];
+    } else if (host.includes("workable.com")) {
+      const titleEl = document.querySelector("h1[data-ui='job-title'], [data-ui='overview-title'], h1");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+      const compEl = document.querySelector("[data-ui='company-name'], .company-name");
+      if (compEl && !result.company) {
+        const c = decodeHTMLEntities(compEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
+    } else if (host.includes("icims.com")) {
+      const titleEl = document.querySelector(".iCIMS_Header h1, .iCIMS_JobTitle, h1");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+      const compEl = document.querySelector(".iCIMS_Company, .company-name");
+      if (compEl && !result.company) {
+        const c = decodeHTMLEntities(compEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
+    } else if (host.includes("jobvite.com")) {
+      const titleEl = document.querySelector(".jv-job-detail-top-title, h2.jv-header, h1");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+      const compEl = document.querySelector(".jv-logo img[alt], .jv-header-company");
+      if (compEl && !result.company) {
+        const c = decodeHTMLEntities(compEl.getAttribute ? compEl.getAttribute("alt") || compEl.textContent : compEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
+    } else if (host.includes("applytojob.com") || host.includes("jazzhr.com")) {
+      const titleEl = document.querySelector("h1.job-title, #header h1, h1");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+      const compEl = document.querySelector(".company-name, a.brand-logo");
+      if (compEl && !result.company) {
+        const c = decodeHTMLEntities(compEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
+    } else if (host.includes("rippling.com") || host.includes("rippling-ats.com")) {
+      const titleEl = document.querySelector("[data-testid='job-title'], h1");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+      const compEl = document.querySelector("[data-testid='company-name'], .company-name");
+      if (compEl && !result.company) {
+        const c = decodeHTMLEntities(compEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
+    } else if (host.includes("joinhandshake.com")) {
+      const titleEl = document.querySelector("[data-hook='job-title'], h1");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+      const compEl = document.querySelector("[data-hook='employer-name'], a[href*='/employers/']");
+      if (compEl && !result.company) {
+        const c = decodeHTMLEntities(compEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
+    } else if (host.includes("taleo.net") || host.includes("oraclecloud.com")) {
+      const titleEl = document.querySelector(".jobtitle, [data-qa='job-title'], h1");
+      if (titleEl && !result.role) {
+        const r = cleanRoleTitle(titleEl.textContent);
+        if (isValidRole(r)) result.role = r;
+      }
+      const compEl = document.querySelector(".companyname, [data-qa='company-name']");
+      if (compEl && !result.company) {
+        const c = decodeHTMLEntities(compEl.textContent);
+        if (isValidCompany(c)) result.company = c;
+      }
     }
 
     // 2.5 Post-application / confirmation page text parsing
@@ -328,6 +576,14 @@ function scrapePageDetails() {
 
       const pageText = document.body.innerText || "";
       if (!result.role || !result.company) {
+        const applyForMatch = pageText.match(/you(?:\s+are|'re)?\s+applying\s+for[:\s]*\n+([^\n]{3,100})\n+([^\n]{2,80})/i);
+        if (applyForMatch) {
+          const candRole = cleanRoleTitle(applyForMatch[1]);
+          const candCompany = decodeHTMLEntities(applyForMatch[2]);
+          if (!result.role && isValidRole(candRole)) result.role = candRole;
+          if (!result.company && isValidCompany(candCompany)) result.company = candCompany;
+        }
+
         const matchAppliedAt = pageText.match(/(?:applied to|application for)(?:\s+the)?\s+([A-Za-z0-9\s/.,#-]{3,60}?)(?:\s+(?:position|role))?\s+at\s+([A-Za-z0-9\s&.,'-]{2,50})/i);
         if (matchAppliedAt) {
           const parsedRole = cleanRoleTitle(matchAppliedAt[1]);
@@ -348,25 +604,22 @@ function scrapePageDetails() {
 
     // 3. Generic DOM fallbacks
     if (!result.role) {
-      const h1 = document.querySelector("h1");
-      if (h1) {
-        const r = cleanRoleTitle(h1.textContent);
+      const explicitRoleEl = document.querySelector('[data-automation-id="jobTitle"], [data-testid="job-title"], [data-qa="job-title"], h1.job-title, h1.posting-title, .job-title h1, [itemprop="title"]');
+      if (explicitRoleEl) {
+        const r = cleanRoleTitle(explicitRoleEl.textContent);
         if (isValidRole(r)) result.role = r;
       }
       if (!result.role) {
-        let t = decodeHTMLEntities(document.title || "");
-        t = t.replace(/\s*[-–|•]\s*(LinkedIn|Indeed|Glassdoor|Greenhouse|Lever|Ashby|Workday|SmartRecruiters|Jobs).*$/i, "");
-        const parts = t.split(/\s*[-–|]\s*/);
-        if (parts.length >= 2) {
-          const rCand = cleanRoleTitle(parts[0]);
-          if (isValidRole(rCand)) result.role = rCand;
-          if (!result.company) {
-            const compCandidate = decodeHTMLEntities(parts[1]).replace(/\b(Jobs|Careers|Indeed|LinkedIn|Workday)\b/gi, "").trim();
-            if (isValidCompany(compCandidate)) result.company = compCandidate;
-          }
-        } else if (isValidRole(t)) {
-          result.role = cleanRoleTitle(t);
+        const h1 = document.querySelector("h1");
+        if (h1) {
+          const r = cleanRoleTitle(h1.textContent);
+          if (isValidRole(r)) result.role = r;
         }
+      }
+      if (!result.role) {
+        const parsed = parseTitleForRoleAndCompany(document.title);
+        if (parsed.role && isValidRole(parsed.role)) result.role = parsed.role;
+        if (!result.company && parsed.company && isValidCompany(parsed.company)) result.company = parsed.company;
       }
     }
 
@@ -412,16 +665,14 @@ function scrapePageDetails() {
       }
     }
 
-    // E. Title split fallback
+    // E. Title parse fallback
     if (!result.company) {
-      const parts = decodeHTMLEntities(document.title || "").split(/\s*[-–|]\s*/);
-      if (parts.length >= 2) {
-        const compCandidate = parts[1].replace(/\b(Jobs|Careers|Indeed|LinkedIn|Workday)\b/gi, "").trim();
-        if (isValidCompany(compCandidate)) result.company = compCandidate;
-        if (!result.company && isValidCompany(parts[0])) {
-          const compCandidate0 = parts[0].replace(/\b(Jobs|Careers|Indeed|LinkedIn|Workday)\b/gi, "").trim();
-          if (isValidCompany(compCandidate0)) result.company = compCandidate0;
-        }
+      const parsed = parseTitleForRoleAndCompany(document.title);
+      if (parsed.company && isValidCompany(parsed.company)) {
+        result.company = parsed.company;
+      }
+      if (!result.role && parsed.role && isValidRole(parsed.role)) {
+        result.role = parsed.role;
       }
     }
 
@@ -589,6 +840,14 @@ function scrapePageDetails() {
       result.role = "";
     }
 
+    // Sanity check: Ensure role and company aren't swapped
+    const ROLE_KW_CHECK = /\b(engineer|developer|intern|internship|co-?op|student|architect|designer|manager|director|analyst|specialist|scientist|lead|consultant|technician|administrator|officer|assistant|coordinator|associate|fellow|apprentice)\b/i;
+    if (result.company && ROLE_KW_CHECK.test(result.company) && (!result.role || !ROLE_KW_CHECK.test(result.role))) {
+      const temp = result.role;
+      result.role = result.company;
+      result.company = isValidCompany(temp) ? temp : "";
+    }
+
     return result;
   } catch (err) {
     return {
@@ -690,6 +949,9 @@ function extractJobIdFromUrl(rawUrl) {
 
   const liMatch = url.match(/\/jobs\/view\/(\d{6,})/i);
   if (liMatch) return liMatch[1];
+
+  const applyMatch = url.match(/\/(?:apply|jobs|posting)\/(\d{4,})(?:[/?#]|$)/i);
+  if (applyMatch) return applyMatch[1];
 
   const wdSlugMatch = url.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/);
   if (wdSlugMatch) return wdSlugMatch[1];
@@ -1089,6 +1351,7 @@ function setupSettingsEvents() {
     extensionSettings.extractRequirements = e.target.checked;
     await chrome.storage.local.set({ extensionSettings });
     applyFieldVisibility();
+    syncExtensionSettingsToOpenTabs(extensionSettings);
   });
 
   document.getElementById("settingNotes")?.addEventListener("change", async (e) => {
@@ -1123,6 +1386,25 @@ function setupSettingsEvents() {
       handleAddCustomField();
     }
   });
+}
+
+async function syncExtensionSettingsToOpenTabs(settings) {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const t of tabs) {
+      if (t.id && t.url && (t.url.includes("localhost") || t.url.includes("127.0.0.1") || t.url.includes("jobtrace") || t.url.includes("job-trace") || t.url.includes("vercel.app"))) {
+        chrome.scripting.executeScript({
+          target: { tabId: t.id },
+          func: (s) => {
+            try {
+              localStorage.setItem("jobtrace_extension_settings", JSON.stringify(s));
+            } catch (e) {}
+          },
+          args: [settings]
+        }).catch(() => {});
+      }
+    }
+  } catch (e) {}
 }
 
 async function syncNewFieldToOpenTabs(newField) {
@@ -1237,9 +1519,11 @@ async function loadSettings() {
 
           if (res?.result) {
             const r = res.result;
-            if (r.settings) {
+            if (r.settings && !stored.extensionSettings) {
               extensionSettings = { ...extensionSettings, ...r.settings };
               chrome.storage.local.set({ extensionSettings });
+            } else if (stored.extensionSettings) {
+              syncExtensionSettingsToOpenTabs(stored.extensionSettings);
             }
             if (r.standardColumns) {
               tableStandardColumns = r.standardColumns;
@@ -1498,7 +1782,7 @@ async function submitApplication() {
 
     setTimeout(() => {
       window.close();
-    }, 1200);
+    }, 500);
   } catch (err) {
     console.error("Save error:", err);
     statusMsg.textContent = "Error saving. Check database connection.";
@@ -1565,6 +1849,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   await loadSettings();
+  applyFieldVisibility();
   await captureActiveTab();
 
   document.getElementById("reCaptureBtn").addEventListener("click", captureActiveTab);

@@ -53,6 +53,10 @@ export function extractJobIdFromUrl(rawUrl: string | null | undefined): string |
   const liMatch = url.match(/\/jobs\/view\/(\d{6,})/i);
   if (liMatch) return liMatch[1];
 
+  // Fitzii / ATS apply path: /apply/(\d{4,}) or /jobs/(\d{4,})
+  const applyMatch = url.match(/\/(?:apply|jobs|posting)\/(\d{4,})(?:[/?#]|$)/i);
+  if (applyMatch) return applyMatch[1];
+
   // Workday slug ending with ID: /job/.../[slug]_[id]
   const wdSlugMatch = url.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/);
   if (wdSlugMatch) return wdSlugMatch[1];
