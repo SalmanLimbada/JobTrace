@@ -15,6 +15,7 @@ export interface ExtensionSettings {
   extractRequirements: boolean;
   requirementsDisplay: RequirementsDisplayMode;
   targetFields: string[];
+  updatedAt?: number;
 }
 
 export interface JobApplication {

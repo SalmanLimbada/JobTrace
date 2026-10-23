@@ -48,15 +48,33 @@
       if (token) payload.authToken = token;
 
       if (typeof chrome !== "undefined" && chrome?.storage?.local) {
-        // Sync extensionSettings safely: do not overwrite user's custom preference in extension storage
         chrome.storage.local.get(["extensionSettings"], (stored) => {
-          if (stored?.extensionSettings) {
+          const extStored = stored?.extensionSettings;
+          let webSettings = null;
+          if (ext) {
+            try { webSettings = JSON.parse(ext); } catch (e) {}
+          }
+
+          if (webSettings && extStored) {
+            const webTime = typeof webSettings.updatedAt === "number" ? webSettings.updatedAt : 0;
+            const extTime = typeof extStored.updatedAt === "number" ? extStored.updatedAt : 0;
+
+            if (webTime > extTime) {
+              // Web app setting is newer -> update extension storage
+              payload.extensionSettings = webSettings;
+            } else if (extTime > webTime) {
+              // Extension setting is newer -> update web localStorage & notify React state
+              try {
+                localStorage.setItem("jobtrace_extension_settings", JSON.stringify(extStored));
+                window.dispatchEvent(new CustomEvent("jobtrace_extension_settings_sync", { detail: extStored }));
+              } catch (e) {}
+            }
+          } else if (webSettings && !extStored) {
+            payload.extensionSettings = webSettings;
+          } else if (extStored && !webSettings) {
             try {
-              localStorage.setItem("jobtrace_extension_settings", JSON.stringify(stored.extensionSettings));
-            } catch (e) {}
-          } else if (ext) {
-            try {
-              payload.extensionSettings = JSON.parse(ext);
+              localStorage.setItem("jobtrace_extension_settings", JSON.stringify(extStored));
+              window.dispatchEvent(new CustomEvent("jobtrace_extension_settings_sync", { detail: extStored }));
             } catch (e) {}
           }
 

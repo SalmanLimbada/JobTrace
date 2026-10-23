@@ -737,7 +737,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const updateExtensionSettings = (partial: Partial<ExtensionSettings>) => {
     setExtensionSettings((prev) => {
-      const next = { ...prev, ...partial };
+      const next = { ...prev, ...partial, updatedAt: Date.now() };
 
       // Keep extractRequirements and targetFields["keyRequirements"] in sync
       if (partial.extractRequirements !== undefined) {
@@ -761,6 +761,28 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       return next;
     });
   };
+
+  useEffect(() => {
+    const handleSync = (e: Event) => {
+      const customEvent = e as CustomEvent<Partial<ExtensionSettings>>;
+      const detail = customEvent.detail;
+      if (detail && typeof detail === "object") {
+        setExtensionSettings((prev) => {
+          const next = { ...prev, ...detail };
+          try {
+            localStorage.setItem(STORAGE_EXTENSION_SETTINGS_KEY, JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+        scheduleCloudSync({ extensionSettings: detail as ExtensionSettings });
+      }
+    };
+
+    window.addEventListener("jobtrace_extension_settings_sync", handleSync);
+    return () => {
+      window.removeEventListener("jobtrace_extension_settings_sync", handleSync);
+    };
+  }, [scheduleCloudSync]);
 
   return (
     <SettingsContext.Provider

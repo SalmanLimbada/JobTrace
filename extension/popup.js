@@ -1514,6 +1514,7 @@ function setupSettingsEvents() {
 
   document.getElementById("settingReqs")?.addEventListener("change", async (e) => {
     extensionSettings.extractRequirements = e.target.checked;
+    extensionSettings.updatedAt = Date.now();
     await chrome.storage.local.set({ extensionSettings });
     applyFieldVisibility();
     syncExtensionSettingsToOpenTabs(extensionSettings);
@@ -1563,6 +1564,7 @@ async function syncExtensionSettingsToOpenTabs(settings) {
           func: (s) => {
             try {
               localStorage.setItem("jobtrace_extension_settings", JSON.stringify(s));
+              window.dispatchEvent(new CustomEvent("jobtrace_extension_settings_sync", { detail: s }));
             } catch (e) {}
           },
           args: [settings]
@@ -1684,9 +1686,18 @@ async function loadSettings() {
 
           if (res?.result) {
             const r = res.result;
-            if (r.settings && !stored.extensionSettings) {
-              extensionSettings = { ...extensionSettings, ...r.settings };
-              chrome.storage.local.set({ extensionSettings });
+            if (r.settings) {
+              const webTime = typeof r.settings.updatedAt === "number" ? r.settings.updatedAt : 0;
+              const extTime = typeof stored.extensionSettings?.updatedAt === "number" ? stored.extensionSettings.updatedAt : 0;
+
+              if (webTime > extTime || !stored.extensionSettings) {
+                // Web app has newer setting -> update extension
+                extensionSettings = { ...extensionSettings, ...r.settings };
+                chrome.storage.local.set({ extensionSettings });
+              } else if (extTime > webTime && stored.extensionSettings) {
+                // Extension has newer setting -> push to web app
+                syncExtensionSettingsToOpenTabs(stored.extensionSettings);
+              }
             } else if (stored.extensionSettings) {
               syncExtensionSettingsToOpenTabs(stored.extensionSettings);
             }
@@ -2019,6 +2030,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await loadSettings();
   applyFieldVisibility();
+  renderSettingsCheckboxes();
   await captureActiveTab();
 
   document.getElementById("reCaptureBtn").addEventListener("click", captureActiveTab);
