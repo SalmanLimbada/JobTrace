@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import StatsBanner from "@/components/StatsBanner";
 import JobForm, { type NewJobPayload } from "@/components/JobForm";
@@ -7,6 +7,8 @@ import JobTable from "@/components/JobTable";
 import Navbar from "@/components/Navbar";
 import AuthModal from "@/components/AuthModal";
 import ScrollNav from "@/components/ScrollNav";
+import TimeframeFilterBar from "@/components/TimeframeFilter";
+import { type TimeframeFilter, isJobInTimeframe } from "@/lib/timeframe";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { extractJobIdFromUrl, getLocalDateString } from "@/lib/jobId";
@@ -18,6 +20,7 @@ export default function Home() {
   const [jobs, setJobs] = useState<Record<string, JobApplication>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [timeframe, setTimeframe] = useState<TimeframeFilter>({ preset: "all" });
   const hasLoadedRef = useRef(false);
   const prevUserIdRef = useRef<string | undefined>(undefined);
 
@@ -306,10 +309,17 @@ export default function Home() {
   }, [fetchApplications]);
 
   const jobList = Object.values(jobs);
-  const totalCount = jobList.length;
-  const interviewCount = jobList.filter((j) => j.status === "Interview").length;
-  const offerCount = jobList.filter((j) => j.status === "Offer").length;
-  const rejectedCount = jobList.filter((j) => j.status === "Rejected").length;
+  const totalMasterCount = jobList.length;
+
+  const filteredJobs = useMemo(() => {
+    if (timeframe.preset === "all") return jobList;
+    return jobList.filter((j) => isJobInTimeframe(j.appliedDate, timeframe));
+  }, [jobList, timeframe]);
+
+  const totalCount = filteredJobs.length;
+  const interviewCount = filteredJobs.filter((j) => j.status === "Interview").length;
+  const offerCount = filteredJobs.filter((j) => j.status === "Offer").length;
+  const rejectedCount = filteredJobs.filter((j) => j.status === "Rejected").length;
 
   async function handleAddJob(payload: NewJobPayload) {
     const today = getLocalDateString();
@@ -663,13 +673,22 @@ export default function Home() {
           </div>
         )}
 
-        <div className="mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f0f6fc]">
-            Dashboard
-          </h1>
-          <p className="text-xs text-[#8b949e] mt-0.5">
-            Track and manage your job applications
-          </p>
+        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f0f6fc]">
+              Dashboard
+            </h1>
+            <p className="text-xs text-[#8b949e] mt-0.5">
+              Track and manage your job applications
+            </p>
+          </div>
+
+          <TimeframeFilterBar
+            value={timeframe}
+            onChange={setTimeframe}
+            totalCount={totalMasterCount}
+            filteredCount={totalCount}
+          />
         </div>
 
         <StatsBanner
@@ -688,7 +707,7 @@ export default function Home() {
           </div>
         ) : (
           <JobTable
-            jobs={jobList}
+            jobs={filteredJobs}
             onStatusChange={handleStatusChange}
             onSaveEdit={handleSaveEdit}
             onDeleteJob={handleDeleteJob}
