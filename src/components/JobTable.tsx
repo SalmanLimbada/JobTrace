@@ -908,7 +908,7 @@ export default function JobTable({
           <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 -mx-1 px-1 sm:mx-0 sm:px-0">
             <div
               ref={pillTrackRef}
-              className="filter-toggle-track relative inline-flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-1 max-w-full shadow-inner gap-0.5 shrink-0"
+              className="filter-toggle-track relative inline-flex items-center bg-[#0d1117] border border-[#30363d] rounded-lg p-1 min-w-max shadow-inner gap-0.5 shrink-0"
             >
               {/* iOS-Style Sliding Frosted Glass Thumb */}
               <div
