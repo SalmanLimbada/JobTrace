@@ -11,16 +11,17 @@ import TimeframeFilterBar from "@/components/TimeframeFilter";
 import { type TimeframeFilter, isJobInTimeframe } from "@/lib/timeframe";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { extractJobIdFromUrl, getLocalDateString } from "@/lib/jobId";
 
 const GUEST_STORAGE_KEY = "job_tracker_guest_jobs";
 
 export default function Home() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { timeframe, setTimeframe } = useSettings();
   const [jobs, setJobs] = useState<Record<string, JobApplication>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [timeframe, setTimeframe] = useState<TimeframeFilter>({ preset: "all" });
   const hasLoadedRef = useRef(false);
   const prevUserIdRef = useRef<string | undefined>(undefined);
 
@@ -673,7 +674,7 @@ export default function Home() {
           </div>
         )}
 
-        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f0f6fc]">
               Dashboard

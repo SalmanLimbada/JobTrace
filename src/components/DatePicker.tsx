@@ -9,6 +9,7 @@ interface DatePickerProps {
   title?: string;
   className?: string;
   id?: string;
+  align?: "left" | "right";
 }
 
 const MONTH_NAMES = [
@@ -52,6 +53,7 @@ export default function DatePicker({
   title = "Select date",
   className = "",
   id,
+  align = "left",
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -160,7 +162,9 @@ export default function DatePicker({
 
       {/* Sleek Custom Dark Calendar Popover */}
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 w-[260px] bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-100 font-sans select-none">
+        <div
+          className={`absolute ${align === "right" ? "right-0" : "left-0"} top-full mt-1.5 z-50 w-[260px] max-w-[calc(100vw-24px)] bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-100 font-sans select-none`}
+        >
           {/* Calendar Header: Month + Year + Navigation */}
           <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-[#30363d]/70">
             <span className="text-xs font-semibold text-[#f0f6fc]">

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useRef, useCallback, ReactNode } from "react";
 import type { CustomFieldDefinition, CustomFieldType } from "@/types/job";
+import type { TimeframeFilter } from "@/lib/timeframe";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 
@@ -21,6 +22,7 @@ export interface CloudSettingsPayload {
   shortcuts: ShortcutSettings;
   statuses: string[];
   extensionSettings: ExtensionSettings;
+  timeframe?: TimeframeFilter;
   updatedAt?: string;
 }
 
@@ -160,6 +162,8 @@ interface SettingsContextType {
   setColumnVisible: (column: string, visible: boolean) => void;
   extensionSettings: ExtensionSettings;
   updateExtensionSettings: (partial: Partial<ExtensionSettings>) => void;
+  timeframe: TimeframeFilter;
+  setTimeframe: (timeframe: TimeframeFilter) => void;
   cloudSyncStatus: CloudSyncStatus;
   syncToCloud: () => Promise<void>;
   applySettings: (payload: {
@@ -183,6 +187,7 @@ const STORAGE_COLUMN_ORDER_KEY = "jobtrace_column_order";
 const STORAGE_SHORTCUTS_KEY = "jobtrace_shortcuts";
 const STORAGE_STATUSES_KEY = "jobtrace_statuses_v1";
 const STORAGE_EXTENSION_SETTINGS_KEY = "jobtrace_extension_settings";
+const STORAGE_TIMEFRAME_KEY = "jobtrace_timeframe_filter";
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -198,6 +203,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [shortcuts, setShortcutsState] = useState<ShortcutSettings>(DEFAULT_SHORTCUTS);
   const [statuses, setStatusesState] = useState<string[]>(DEFAULT_STATUSES);
   const [extensionSettings, setExtensionSettings] = useState<ExtensionSettings>(DEFAULT_EXTENSION_SETTINGS);
+  const [timeframe, setTimeframeState] = useState<TimeframeFilter>({ preset: "all" });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const latestSettingsRef = useRef<CloudSettingsPayload>({
@@ -210,6 +216,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     shortcuts,
     statuses,
     extensionSettings,
+    timeframe,
   });
 
   useEffect(() => {
@@ -223,8 +230,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       shortcuts,
       statuses,
       extensionSettings,
+      timeframe,
     };
-  }, [theme, filterStyle, customFields, standardColumns, showRowNumbers, columnOrder, shortcuts, statuses, extensionSettings]);
+  }, [theme, filterStyle, customFields, standardColumns, showRowNumbers, columnOrder, shortcuts, statuses, extensionSettings, timeframe]);
 
   const syncToCloud = useCallback(async (customSnapshot?: Partial<CloudSettingsPayload>) => {
     if (!user) {
@@ -310,6 +318,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setExtensionSettings(cloudData.extensionSettings);
         try { localStorage.setItem(STORAGE_EXTENSION_SETTINGS_KEY, JSON.stringify(cloudData.extensionSettings)); } catch {}
       }
+      if (cloudData.timeframe && typeof cloudData.timeframe === "object") {
+        setTimeframeState(cloudData.timeframe);
+        try { localStorage.setItem(STORAGE_TIMEFRAME_KEY, JSON.stringify(cloudData.timeframe)); } catch {}
+      }
       setCloudSyncStatus("synced");
       window.dispatchEvent(new Event("jobtrace_settings_updated"));
     } else {
@@ -324,6 +336,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const savedFilterStyle = localStorage.getItem(STORAGE_FILTER_STYLE_KEY);
       if (savedFilterStyle === "pills" || savedFilterStyle === "dropdown") {
         setFilterStyleState(savedFilterStyle);
+      }
+      // Timeframe Filter
+      const savedTimeframe = localStorage.getItem(STORAGE_TIMEFRAME_KEY);
+      if (savedTimeframe) {
+        try {
+          const parsed = JSON.parse(savedTimeframe);
+          if (parsed && typeof parsed.preset === "string") {
+            setTimeframeState(parsed);
+          }
+        } catch {}
       }
       // Extension Settings
       const savedExt = localStorage.getItem(STORAGE_EXTENSION_SETTINGS_KEY);
@@ -784,6 +806,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
   }, [scheduleCloudSync]);
 
+  const setTimeframe = (tf: TimeframeFilter) => {
+    setTimeframeState(tf);
+    try {
+      localStorage.setItem(STORAGE_TIMEFRAME_KEY, JSON.stringify(tf));
+    } catch {}
+    scheduleCloudSync({ timeframe: tf });
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -820,6 +850,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setColumnVisible,
         extensionSettings,
         updateExtensionSettings,
+        timeframe,
+        setTimeframe,
         applySettings,
         cloudSyncStatus,
         syncToCloud,
