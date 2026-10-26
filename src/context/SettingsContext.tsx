@@ -53,19 +53,16 @@ export const STANDARD_COLUMN_NAMES: Record<keyof StandardColumnsSettings, string
 export interface ShortcutSettings {
   focusSearch: string;
   addJob: string;
-  openSettings: string;
 }
 
 export const DEFAULT_SHORTCUTS: ShortcutSettings = {
   focusSearch: "/",
   addJob: "n",
-  openSettings: ",",
 };
 
 export const SHORTCUT_LABELS: Record<keyof ShortcutSettings, { label: string; desc: string }> = {
   focusSearch: { label: "Focus Search", desc: "Jump to search bar" },
   addJob: { label: "New Application", desc: "Focus company input in form" },
-  openSettings: { label: "Open Settings", desc: "Open preferences modal" },
 };
 
 export const DEFAULT_STATUSES: string[] = ["Applied", "Interview", "Offer", "Rejected"];
@@ -121,13 +118,6 @@ export const DEFAULT_EXTENSION_SETTINGS: ExtensionSettings = {
   targetFields: DEFAULT_EXTENSION_TARGET_FIELDS,
 };
 
-export interface ColumnSettings {
-  salary: boolean;
-  location: boolean;
-  deadlineDate: boolean;
-  [key: string]: boolean;
-}
-
 interface SettingsContextType {
   theme: AppTheme;
   setTheme: (theme: AppTheme) => void;
@@ -156,10 +146,6 @@ interface SettingsContextType {
   shortcuts: ShortcutSettings;
   updateShortcut: (action: keyof ShortcutSettings, key: string) => void;
   resetShortcuts: () => void;
-  isSettingsOpen: boolean;
-  setIsSettingsOpen: (open: boolean) => void;
-  columns: ColumnSettings;
-  setColumnVisible: (column: string, visible: boolean) => void;
   extensionSettings: ExtensionSettings;
   updateExtensionSettings: (partial: Partial<ExtensionSettings>) => void;
   timeframe: TimeframeFilter;
@@ -204,7 +190,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [statuses, setStatusesState] = useState<string[]>(DEFAULT_STATUSES);
   const [extensionSettings, setExtensionSettings] = useState<ExtensionSettings>(DEFAULT_EXTENSION_SETTINGS);
   const [timeframe, setTimeframeState] = useState<TimeframeFilter>({ preset: "all" });
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const latestSettingsRef = useRef<CloudSettingsPayload>({
     theme,
@@ -400,10 +385,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       // Shortcuts
       const savedShortcuts = localStorage.getItem(STORAGE_SHORTCUTS_KEY);
       if (savedShortcuts) {
-        setShortcutsState({
-          ...DEFAULT_SHORTCUTS,
-          ...JSON.parse(savedShortcuts),
-        });
+        try {
+          const parsed = JSON.parse(savedShortcuts);
+          setShortcutsState({
+            focusSearch: parsed.focusSearch || DEFAULT_SHORTCUTS.focusSearch,
+            addJob: parsed.addJob || DEFAULT_SHORTCUTS.addJob,
+          });
+        } catch {}
       }
 
       // Custom Fields
@@ -685,30 +673,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     scheduleCloudSync({ statuses: DEFAULT_STATUSES });
   };
 
-  // Backwards compatibility helper
-  const columns: ColumnSettings = {
-    salary: customFields.some((f) => f.id === "salary" && f.enabled),
-    location: customFields.some((f) => f.id === "location" && f.enabled),
-    deadlineDate: customFields.some((f) => f.id === "deadlineDate" && f.enabled),
-  };
-  customFields.forEach((f) => {
-    columns[f.id] = f.enabled;
-  });
-
-  const setColumnVisible = (columnId: string, visible: boolean) => {
-    const exists = customFields.find((f) => f.id === columnId);
-    if (exists) {
-      toggleCustomField(columnId);
-    } else {
-      const suggestion = SUGGESTED_FIELDS.find((s) => s.id === columnId);
-      if (suggestion) {
-        addCustomField(suggestion.name, suggestion.type);
-      } else {
-        addCustomField(columnId, "text");
-      }
-    }
-  };
-
   const applySettings = (payload: {
     showRowNumbers: boolean;
     standardColumns: StandardColumnsSettings;
@@ -844,10 +808,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         shortcuts,
         updateShortcut,
         resetShortcuts,
-        isSettingsOpen,
-        setIsSettingsOpen,
-        columns,
-        setColumnVisible,
         extensionSettings,
         updateExtensionSettings,
         timeframe,

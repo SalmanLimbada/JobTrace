@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useDeferredValue } from "react";
-import { useRouter } from "next/navigation";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { exportApplicationsToCSV } from "@/lib/csv";
 import CSVImportModal from "@/components/CSVImportModal";
@@ -143,7 +142,6 @@ export default function JobTable({
   editingJob: editingJobProp,
   onEditJob,
 }: JobTableProps) {
-  const router = useRouter();
   const {
     customFields,
     standardColumns,
@@ -222,46 +220,6 @@ export default function JobTable({
   const [isActionsOpen, setIsActionsOpen] = useState(false);
   const pillTrackRef = useRef<HTMLDivElement>(null);
   const [thumbStyle, setThumbStyle] = useState({ left: 4, width: 0, opacity: 0 });
-
-  // Global Keyboard Shortcuts
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      if (editingJob || isImportModalOpen) {
-        return;
-      }
-
-      const key = e.key.toLowerCase();
-
-      if (key === shortcuts.focusSearch?.toLowerCase()) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      } else if (key === shortcuts.addJob?.toLowerCase()) {
-        e.preventDefault();
-        const input = document.getElementById("new-job-company-input");
-        if (input) {
-          input.focus();
-          input.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      } else if (key === shortcuts.openSettings?.toLowerCase()) {
-        e.preventDefault();
-        router.push("/settings");
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [shortcuts, editingJob, isImportModalOpen, router]);
 
   // Click outside listener for "More ▾" dropdown
   useEffect(() => {
@@ -564,6 +522,66 @@ export default function JobTable({
   const visibleJobs = useMemo(() => {
     return sortedJobs.slice(0, visibleCount);
   }, [sortedJobs, visibleCount]);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (
+        editingJob ||
+        isImportModalOpen ||
+        isExportModalOpen ||
+        isCleanUpModalOpen ||
+        jobToDelete ||
+        viewingDetail ||
+        selectedRequirementsJob
+      ) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+
+      // Focus Search
+      if (key === shortcuts.focusSearch?.toLowerCase()) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+
+      // Add Job
+      if (key === shortcuts.addJob?.toLowerCase()) {
+        e.preventDefault();
+        const input = document.getElementById("new-job-company-input");
+        if (input) {
+          input.focus();
+          input.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    shortcuts,
+    editingJob,
+    isImportModalOpen,
+    isExportModalOpen,
+    isCleanUpModalOpen,
+    jobToDelete,
+    viewingDetail,
+    selectedRequirementsJob,
+  ]);
 
   function renderCell(job: JobApplication, colId: string) {
     switch (colId) {
