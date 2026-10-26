@@ -6,14 +6,18 @@ function extractJobId(rawUrl) {
   const url = rawUrl.trim();
   if (url === "#" || url === "" || url.toLowerCase() === "n/a") return null;
 
+  // 1. Standard Requisition prefixes (JR102948, REQ-84920, R-12345, R102948)
   const reqMatch = url.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i);
   if (reqMatch) return reqMatch[1].toUpperCase();
 
+  // 2. Query parameters used across all major ATS platforms:
+  // Greenhouse (gh_jid), Indeed (jk), LinkedIn (currentJobId), Taleo (job, reqId), Oracle (reqId, postingId), etc.
   try {
     const parsed = new URL(url.startsWith("http") ? url : "https://" + url);
     const qParams = [
-      "jobid", "job_id", "jobopeningid", "job_opening_id", "postingid", "posting_id",
-      "reqid", "req_id", "requisitionid", "requisition_id", "gh_jid", "jk", "currentjobid", "id"
+      "gh_jid", "jk", "jobid", "job_id", "jobopeningid", "job_opening_id",
+      "postingid", "posting_id", "reqid", "req_id", "requisitionid", "requisition_id",
+      "currentjobid", "job", "id"
     ];
     for (const [k, v] of parsed.searchParams.entries()) {
       if (qParams.includes(k.toLowerCase()) && v && v.length >= 3) {
@@ -22,17 +26,29 @@ function extractJobId(rawUrl) {
     }
   } catch (e) {}
 
-  const ghMatch = url.match(/\/jobs\/(\d{5,})/i);
-  if (ghMatch) return ghMatch[1];
+  // 3. UUIDs in path (Lever, Ashby, SmartRecruiters: /jobs/uuid, /company/uuid, etc.)
+  const uuidMatch = url.match(/\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})(?:[/?#]|$)/i);
+  if (uuidMatch) return uuidMatch[1].toUpperCase();
 
-  const leverMatch = url.match(/\/jobs\/([a-f0-9-]{36})/i);
-  if (leverMatch) return leverMatch[1];
-
+  // 4. LinkedIn view (/jobs/view/123456789)
   const liMatch = url.match(/\/jobs\/view\/(\d{6,})/i);
   if (liMatch) return liMatch[1];
 
-  const applyMatch = url.match(/\/(?:apply|jobs|posting)\/(\d{4,})(?:[/?#]|$)/i);
-  if (applyMatch) return applyMatch[1];
+  // 5. Workday slug ending in numeric or alphanumeric ID (e.g. _1039072, _JR12345)
+  const wdSlugMatch = url.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/);
+  if (wdSlugMatch) return wdSlugMatch[1].toUpperCase();
+
+  // 6. Workable (/j/9A8B7C6D5E)
+  const workableMatch = url.match(/\/j\/([A-Za-z0-9]{8,})(?:[/?#]|$)/i);
+  if (workableMatch) return workableMatch[1].toUpperCase();
+
+  // 7. Generic /jobs/12345, /apply/12345, /careers/12345, /posting/12345 (Greenhouse, BambooHR, iCIMS, SmartRecruiters)
+  const pathIdMatch = url.match(/\/(?:jobs|apply|careers|posting|job)\/(\d{3,})(?:[/?#]|$)/i);
+  if (pathIdMatch) return pathIdMatch[1];
+
+  // 8. SmartRecruiters numeric ID in slug (e.g. /743999999999-role-title)
+  const srMatch = url.match(/\/(\d{10,})(?:-[a-z0-9-]+)?(?:[/?#]|$)/i);
+  if (srMatch) return srMatch[1];
 
   return null;
 }
@@ -58,10 +74,11 @@ function normalizeUrl(rawUrl) {
   }
 }
 
-function findMatchingApplication(url, applications) {
+function findMatchingApplication(url, applications, tabTitle = "") {
   if (!url || !Array.isArray(applications) || applications.length === 0) return null;
   const targetNorm = normalizeUrl(url);
   const targetId = extractJobId(url);
+  const cleanTitle = tabTitle ? tabTitle.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
 
   for (const app of applications) {
     // 1. Direct normalized URL match
@@ -70,21 +87,33 @@ function findMatchingApplication(url, applications) {
       if (appNorm && appNorm === targetNorm) return app;
     }
 
-    // 2. Job ID match from URL or custom field
-    if (targetId) {
-      const appId = (
-        app.custom_fields?.jobId ||
-        app.customFields?.jobId ||
-        extractJobId(app.url) ||
-        ""
-      ).trim().toUpperCase();
-      if (appId && appId === targetId) return app;
+    // 2. Job ID match from URL, slug, or custom field
+    const appId = (
+      app.custom_fields?.jobId ||
+      app.customFields?.jobId ||
+      extractJobId(app.url) ||
+      ""
+    ).trim().toUpperCase();
+
+    if (targetId && appId && targetId === appId) {
+      return app;
+    }
+
+    // 3. Fallback when URL was toggled OFF: Match by Tab Title containing Company & Role
+    if (cleanTitle && app.company && app.role) {
+      const compClean = app.company.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const roleClean = app.role.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (compClean.length >= 3 && roleClean.length >= 6) {
+        if (cleanTitle.includes(compClean) && cleanTitle.includes(roleClean)) {
+          return app;
+        }
+      }
     }
   }
   return null;
 }
 
-async function checkTab(tabId, url) {
+async function checkTab(tabId, url, tabTitle = "") {
   if (!tabId || !url || url.startsWith("chrome://") || url.startsWith("edge://") || url.startsWith("about:") || url.includes("jobtrace")) {
     chrome.action.setBadgeText({ tabId, text: "" });
     chrome.action.setTitle({ tabId, title: "JobTrace" });
@@ -92,7 +121,7 @@ async function checkTab(tabId, url) {
   }
 
   const { cachedApplications } = await chrome.storage.local.get(["cachedApplications"]);
-  const match = findMatchingApplication(url, cachedApplications);
+  const match = findMatchingApplication(url, cachedApplications, tabTitle);
 
   if (match) {
     chrome.action.setBadgeText({ tabId, text: "!" });
@@ -111,7 +140,7 @@ async function checkTab(tabId, url) {
 // Check when tab navigates or finishes loading
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" || changeInfo.url) {
-    checkTab(tabId, tab.url || changeInfo.url);
+    checkTab(tabId, tab.url || changeInfo.url, tab.title || "");
   }
 });
 
@@ -119,7 +148,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   try {
     const tab = await chrome.tabs.get(activeInfo.tabId);
-    if (tab?.url) checkTab(tab.id, tab.url);
+    if (tab?.url) checkTab(tab.id, tab.url, tab.title || "");
   } catch (e) {}
 });
 
@@ -128,7 +157,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.cachedApplications) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id && tabs[0]?.url) {
-        checkTab(tabs[0].id, tabs[0].url);
+        checkTab(tabs[0].id, tabs[0].url, tabs[0].title || "");
       }
     });
   }

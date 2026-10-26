@@ -243,26 +243,29 @@ export function extractJobIdFromUrl(rawUrl: string | null | undefined): string |
     }
   } catch {}
 
-  // 3. Known ATS path structures
-  // Greenhouse: /jobs/(\d+)
-  const ghMatch = url.match(/\/jobs\/(\d{5,})/i);
-  if (ghMatch) return ghMatch[1];
+  // 3. UUIDs in path (Lever, Ashby, SmartRecruiters: /jobs/uuid, /company/uuid, etc.)
+  const uuidMatch = url.match(/\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})(?:[/?#]|$)/i);
+  if (uuidMatch) return uuidMatch[1].toUpperCase();
 
-  // Lever: /jobs/([a-f0-9-]{36})
-  const leverMatch = url.match(/\/jobs\/([a-f0-9-]{36})/i);
-  if (leverMatch) return leverMatch[1];
-
-  // LinkedIn: /jobs/view/(\d+)
+  // 4. LinkedIn view (/jobs/view/123456789)
   const liMatch = url.match(/\/jobs\/view\/(\d{6,})/i);
   if (liMatch) return liMatch[1];
 
-  // Fitzii / ATS apply path: /apply/(\d{4,}) or /jobs/(\d{4,})
-  const applyMatch = url.match(/\/(?:apply|jobs|posting)\/(\d{4,})(?:[/?#]|$)/i);
-  if (applyMatch) return applyMatch[1];
-
-  // Workday slug ending with ID: /job/.../[slug]_[id]
+  // 5. Workday slug ending in numeric or alphanumeric ID (e.g. _1039072, _JR12345)
   const wdSlugMatch = url.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/);
-  if (wdSlugMatch) return wdSlugMatch[1];
+  if (wdSlugMatch) return wdSlugMatch[1].toUpperCase();
+
+  // 6. Workable (/j/9A8B7C6D5E)
+  const workableMatch = url.match(/\/j\/([A-Za-z0-9]{8,})(?:[/?#]|$)/i);
+  if (workableMatch) return workableMatch[1].toUpperCase();
+
+  // 7. Generic /jobs/12345, /apply/12345, /careers/12345, /posting/12345 (Greenhouse, BambooHR, iCIMS, SmartRecruiters)
+  const pathIdMatch = url.match(/\/(?:jobs|apply|careers|posting|job)\/(\d{3,})(?:[/?#]|$)/i);
+  if (pathIdMatch) return pathIdMatch[1];
+
+  // 8. SmartRecruiters numeric ID in slug (e.g. /743999999999-role-title)
+  const srMatch = url.match(/\/(\d{10,})(?:-[a-z0-9-]+)?(?:[/?#]|$)/i);
+  if (srMatch) return srMatch[1];
 
   return null;
 }

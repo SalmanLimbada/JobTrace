@@ -829,8 +829,12 @@ function scrapePageDetails() {
         if (match) result.jobId = match[1].trim();
       }
       if (!result.jobId) {
-        const reqMatch = window.location.href.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i);
-        if (reqMatch) result.jobId = reqMatch[1].toUpperCase();
+        const urlIdMatch = window.location.href.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i) ||
+          window.location.href.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/) ||
+          window.location.href.match(/\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})(?:[/?#]|$)/i) ||
+          window.location.href.match(/\/(?:jobs|apply|careers|posting|job)\/(\d{3,})(?:[/?#]|$)/i) ||
+          window.location.href.match(/[?&](?:gh_jid|jk|jobid|job_id|reqid|req_id|currentjobid)=([^&#]+)/i);
+        if (urlIdMatch) result.jobId = (urlIdMatch[1] || "").toUpperCase();
       }
     } catch (e) {}
 
@@ -925,48 +929,49 @@ function extractJobIdFromUrl(rawUrl) {
   const url = rawUrl.trim();
   if (url === "#" || url === "" || url.toLowerCase() === "n/a") return null;
 
+  // 1. Standard Requisition prefixes (JR102948, REQ-84920, R-12345, R102948)
   const reqMatch = url.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i);
   if (reqMatch) return reqMatch[1].toUpperCase();
 
+  // 2. Query parameters used across all major ATS platforms:
+  // Greenhouse (gh_jid), Indeed (jk), LinkedIn (currentJobId), Taleo (job, reqId), Oracle (reqId, postingId), etc.
   try {
     const parsed = new URL(url.startsWith("http") ? url : "https://" + url);
     const qParams = [
-      "jobid",
-      "job_id",
-      "jobopeningid",
-      "job_opening_id",
-      "postingid",
-      "posting_id",
-      "reqid",
-      "req_id",
-      "requisitionid",
-      "requisition_id",
-      "gh_jid",
-      "jk",
-      "currentjobid",
-      "id",
+      "gh_jid", "jk", "jobid", "job_id", "jobopeningid", "job_opening_id",
+      "postingid", "posting_id", "reqid", "req_id", "requisitionid", "requisition_id",
+      "currentjobid", "job", "id"
     ];
     for (const [k, v] of parsed.searchParams.entries()) {
       if (qParams.includes(k.toLowerCase()) && v && v.length >= 3) {
-        return v;
+        return v.toUpperCase();
       }
     }
   } catch (e) {}
 
-  const ghMatch = url.match(/\/jobs\/(\d{5,})/i);
-  if (ghMatch) return ghMatch[1];
+  // 3. UUIDs in path (Lever, Ashby, SmartRecruiters: /jobs/uuid, /company/uuid, etc.)
+  const uuidMatch = url.match(/\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})(?:[/?#]|$)/i);
+  if (uuidMatch) return uuidMatch[1].toUpperCase();
 
-  const leverMatch = url.match(/\/jobs\/([a-f0-9-]{36})/i);
-  if (leverMatch) return leverMatch[1];
-
+  // 4. LinkedIn view (/jobs/view/123456789)
   const liMatch = url.match(/\/jobs\/view\/(\d{6,})/i);
   if (liMatch) return liMatch[1];
 
-  const applyMatch = url.match(/\/(?:apply|jobs|posting)\/(\d{4,})(?:[/?#]|$)/i);
-  if (applyMatch) return applyMatch[1];
-
+  // 5. Workday slug ending in numeric or alphanumeric ID (e.g. _1039072, _JR12345)
   const wdSlugMatch = url.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/);
-  if (wdSlugMatch) return wdSlugMatch[1];
+  if (wdSlugMatch) return wdSlugMatch[1].toUpperCase();
+
+  // 6. Workable (/j/9A8B7C6D5E)
+  const workableMatch = url.match(/\/j\/([A-Za-z0-9]{8,})(?:[/?#]|$)/i);
+  if (workableMatch) return workableMatch[1].toUpperCase();
+
+  // 7. Generic /jobs/12345, /apply/12345, /careers/12345, /posting/12345 (Greenhouse, BambooHR, iCIMS, SmartRecruiters)
+  const pathIdMatch = url.match(/\/(?:jobs|apply|careers|posting|job)\/(\d{3,})(?:[/?#]|$)/i);
+  if (pathIdMatch) return pathIdMatch[1];
+
+  // 8. SmartRecruiters numeric ID in slug (e.g. /743999999999-role-title)
+  const srMatch = url.match(/\/(\d{10,})(?:-[a-z0-9-]+)?(?:[/?#]|$)/i);
+  if (srMatch) return srMatch[1];
 
   return null;
 }
@@ -1266,10 +1271,15 @@ function findDuplicateJob(target, existingList) {
         // Distinct Job IDs = different requisitions. If company & role match, it's a similar opening.
         const compMatch = tComp && eComp && (
           tComp === eComp ||
+          (tComp.length >= 3 && eComp.length >= 3 && (tComp.includes(eComp) || eComp.includes(tComp))) ||
           cleanCompanyForMatch(target.company) === cleanCompanyForMatch(existing.company) ||
           areKnownAliases(target.company, existing.company)
         );
-        if (compMatch && tRole && eRole && tRole === eRole) {
+        const roleMatch = tRole && eRole && (
+          tRole === eRole ||
+          (tRole.length >= 8 && eRole.length >= 8 && (tRole.includes(eRole) || eRole.includes(tRole)))
+        );
+        if (compMatch && roleMatch) {
           return { job: existing, matchType: "similar" };
         }
         continue;
@@ -1279,11 +1289,16 @@ function findDuplicateJob(target, existingList) {
     // 3. Exact Company + Role match (within MAX_DUPLICATE_DAYS)
     const compMatch = tComp && eComp && (
       tComp === eComp ||
+      (tComp.length >= 3 && eComp.length >= 3 && (tComp.includes(eComp) || eComp.includes(tComp))) ||
       cleanCompanyForMatch(target.company) === cleanCompanyForMatch(existing.company) ||
       areKnownAliases(target.company, existing.company)
     );
+    const roleMatch = tRole && eRole && (
+      tRole === eRole ||
+      (tRole.length >= 8 && eRole.length >= 8 && (tRole.includes(eRole) || eRole.includes(tRole)))
+    );
 
-    if (compMatch && tRole && eRole && tRole === eRole) {
+    if (compMatch && roleMatch) {
       if (eDate) {
         const diffDays = getDaysBetween(tDate, eDate);
         if (diffDays !== null && diffDays > MAX_DUPLICATE_DAYS) {

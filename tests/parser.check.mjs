@@ -232,17 +232,46 @@ function cleanUrl(u) {
   }
 }
 function extractJobId(rawUrl) {
-  if (!rawUrl) return null;
-  const reqMatch = rawUrl.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i);
+  if (!rawUrl || typeof rawUrl !== "string") return null;
+  const url = rawUrl.trim();
+  if (url === "#" || url === "" || url.toLowerCase() === "n/a") return null;
+
+  const reqMatch = url.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i);
   if (reqMatch) return reqMatch[1].toUpperCase();
+
   try {
-    const parsed = new URL(rawUrl.startsWith("http") ? rawUrl : "https://" + rawUrl);
+    const parsed = new URL(url.startsWith("http") ? url : "https://" + url);
+    const qParams = [
+      "gh_jid", "jk", "jobid", "job_id", "jobopeningid", "job_opening_id",
+      "postingid", "posting_id", "reqid", "req_id", "requisitionid", "requisition_id",
+      "currentjobid", "job", "id"
+    ];
     for (const [k, v] of parsed.searchParams.entries()) {
-      if (["gh_jid", "jobid", "job_id", "jk"].includes(k.toLowerCase()) && v && v.length >= 3) return v.toUpperCase();
+      if (qParams.includes(k.toLowerCase()) && v && v.length >= 3) {
+        return v.toUpperCase();
+      }
     }
-  } catch {}
-  const m = rawUrl.match(/\/jobs\/(\d{5,})/i);
-  return m ? m[1] : null;
+  } catch (e) {}
+
+  const uuidMatch = url.match(/\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})(?:[/?#]|$)/i);
+  if (uuidMatch) return uuidMatch[1].toUpperCase();
+
+  const liMatch = url.match(/\/jobs\/view\/(\d{6,})/i);
+  if (liMatch) return liMatch[1];
+
+  const wdSlugMatch = url.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/);
+  if (wdSlugMatch) return wdSlugMatch[1].toUpperCase();
+
+  const workableMatch = url.match(/\/j\/([A-Za-z0-9]{8,})(?:[/?#]|$)/i);
+  if (workableMatch) return workableMatch[1].toUpperCase();
+
+  const pathIdMatch = url.match(/\/(?:jobs|apply|careers|posting|job)\/(\d{3,})(?:[/?#]|$)/i);
+  if (pathIdMatch) return pathIdMatch[1];
+
+  const srMatch = url.match(/\/(\d{10,})(?:-[a-z0-9-]+)?(?:[/?#]|$)/i);
+  if (srMatch) return srMatch[1];
+
+  return null;
 }
 
 function testFindDuplicate(target, list) {
@@ -298,5 +327,24 @@ assert.equal(d3?.matchType, "similar", "Should be similar match for distinct req
 // Test 5D: Completely different role & company -> No match
 const d4 = testFindDuplicate({ company: "Google", role: "Data Scientist", url: "https://google.com/jobs/555" }, savedJobs);
 assert.equal(d4, null, "Should return null for unrelated job");
+
+// Test 5E: Multi-ATS ID Extraction & Matching
+assert.equal(extractJobId("https://jobs.lever.co/figma/6f9a0c12-3456-7890-abcd-ef1234567890"), "6F9A0C12-3456-7890-ABCD-EF1234567890", "Lever UUID");
+assert.equal(extractJobId("https://jobs.ashbyhq.com/openai/91a27e0a-a53f-488f-9a42-7cf16f082e66"), "91A27E0A-A53F-488F-9A42-7CF16F082E66", "Ashby UUID");
+assert.equal(extractJobId("https://rakuten.wd1.myworkdayjobs.com/en-US/Kobo/job/Toronto-Canada/eReader-QA_1039072"), "1039072", "Workday numeric slug");
+assert.equal(extractJobId("https://adobe.wd5.myworkdayjobs.com/en-US/external/job/San-Jose/Engineer_JR109283"), "JR109283", "Workday requisition");
+assert.equal(extractJobId("https://www.indeed.com/viewjob?jk=abcdef1234567890"), "ABCDEF1234567890", "Indeed jk");
+assert.equal(extractJobId("https://www.linkedin.com/jobs/view/3920192847/"), "3920192847", "LinkedIn view");
+assert.equal(extractJobId("https://jobs.smartrecruiters.com/AcmeCorp/743999999999-software-engineer"), "743999999999", "SmartRecruiters slug");
+assert.equal(extractJobId("https://apply.workable.com/acme-corp/j/8C7D6E5F4A/"), "8C7D6E5F4A", "Workable shortcode");
+assert.equal(extractJobId("https://acme.bamboohr.com/careers/482"), "482", "BambooHR careers");
+assert.equal(extractJobId("https://careers-acme.icims.com/jobs/12849/lead-developer/job"), "12849", "iCIMS");
+
+// Test 5F: Workday slug match (e.g. Rakuten Workday URL with _1039072)
+const workdaySaved = [
+  { company: "Rakuten Kobo", role: "Quality Assurance Intern", url: "#", custom_fields: { jobId: "1039072" }, applied_date: "2026-10-22" }
+];
+const d5 = testFindDuplicate({ url: "https://rakuten.wd1.myworkdayjobs.com/en-US/Kobo/job/Toronto-Canada/eReader-Quality-Assurance-Intern--12-month-contract-_1039072", company: "Rakuten", role: "eReader Quality Assurance Intern" }, workdaySaved);
+assert.equal(d5?.matchType, "exact", "Workday slug 1039072 should match exact jobId");
 
 console.log("All parser check tests passed successfully!");
