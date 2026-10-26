@@ -114,33 +114,39 @@ function findMatchingApplication(url, applications, tabTitle = "") {
 }
 
 async function checkTab(tabId, url, tabTitle = "") {
-  if (!tabId || !url || url.startsWith("chrome://") || url.startsWith("edge://") || url.startsWith("about:") || url.includes("jobtrace")) {
-    chrome.action.setBadgeText({ tabId, text: "" });
-    chrome.action.setTitle({ tabId, title: "JobTrace" });
+  if (!tabId || typeof tabId !== "number" || !url || url.startsWith("chrome://") || url.startsWith("edge://") || url.startsWith("about:") || url.includes("jobtrace")) {
+    try {
+      chrome.action.setBadgeText({ tabId, text: "" });
+      chrome.action.setTitle({ tabId, title: "JobTrace" });
+    } catch (e) {}
     return;
   }
 
-  const { cachedApplications } = await chrome.storage.local.get(["cachedApplications"]);
-  const match = findMatchingApplication(url, cachedApplications, tabTitle);
+  try {
+    const { cachedApplications } = await chrome.storage.local.get(["cachedApplications"]);
+    const match = findMatchingApplication(url, cachedApplications, tabTitle);
 
-  if (match) {
-    chrome.action.setBadgeText({ tabId, text: "!" });
-    chrome.action.setBadgeBackgroundColor({ tabId, color: "#f59e0b" });
-    const comp = match.company || "Company";
-    const role = match.role ? ` (${match.role})` : "";
-    const date = match.applied_date || match.appliedDate || "";
-    const dateStr = date ? ` on ${date}` : "";
-    chrome.action.setTitle({ tabId, title: `⚠️ JobTrace: Already applied to ${comp}${role}${dateStr}` });
-  } else {
-    chrome.action.setBadgeText({ tabId, text: "" });
-    chrome.action.setTitle({ tabId, title: "JobTrace" });
+    if (match) {
+      await chrome.action.setBadgeText({ tabId, text: "!" });
+      await chrome.action.setBadgeBackgroundColor({ tabId, color: "#f59e0b" });
+      const comp = match.company || "Company";
+      const role = match.role ? ` (${match.role})` : "";
+      const date = match.applied_date || match.appliedDate || "";
+      const dateStr = date ? ` on ${date}` : "";
+      await chrome.action.setTitle({ tabId, title: `⚠️ JobTrace: Already applied to ${comp}${role}${dateStr}` });
+    } else {
+      await chrome.action.setBadgeText({ tabId, text: "" });
+      await chrome.action.setTitle({ tabId, title: "JobTrace" });
+    }
+  } catch (err) {
+    // Tab was closed or navigated away before badge could be set; ignore safely
   }
 }
 
 // Check when tab navigates or finishes loading
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" || changeInfo.url) {
-    checkTab(tabId, tab.url || changeInfo.url, tab.title || "");
+    checkTab(tabId, tab?.url || changeInfo.url, tab?.title || "").catch(() => {});
   }
 });
 
@@ -148,7 +154,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   try {
     const tab = await chrome.tabs.get(activeInfo.tabId);
-    if (tab?.url) checkTab(tab.id, tab.url, tab.title || "");
+    if (tab?.url) checkTab(tab.id, tab.url, tab.title || "").catch(() => {});
   } catch (e) {}
 });
 
@@ -157,7 +163,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.cachedApplications) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id && tabs[0]?.url) {
-        checkTab(tabs[0].id, tabs[0].url, tabs[0].title || "");
+        checkTab(tabs[0].id, tabs[0].url, tabs[0].title || "").catch(() => {});
       }
     });
   }
