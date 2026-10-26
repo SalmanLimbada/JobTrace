@@ -318,10 +318,23 @@ export default function Home() {
     return jobList.filter((j) => isJobInTimeframe(j.appliedDate, timeframe));
   }, [jobList, timeframe]);
 
-  const totalCount = filteredJobs.length;
-  const interviewCount = filteredJobs.filter((j) => j.status === "Interview").length;
-  const offerCount = filteredJobs.filter((j) => j.status === "Offer").length;
-  const rejectedCount = filteredJobs.filter((j) => j.status === "Rejected").length;
+  const stats = useMemo(() => {
+    let interviews = 0;
+    let offers = 0;
+    let rejected = 0;
+    for (let i = 0; i < filteredJobs.length; i++) {
+      const s = filteredJobs[i].status;
+      if (s === "Interview") interviews++;
+      else if (s === "Offer") offers++;
+      else if (s === "Rejected") rejected++;
+    }
+    return {
+      total: filteredJobs.length,
+      interviews,
+      offers,
+      rejected,
+    };
+  }, [filteredJobs]);
 
   async function handleAddJob(payload: NewJobPayload) {
     const today = getLocalDateString();
@@ -689,15 +702,15 @@ export default function Home() {
             value={timeframe}
             onChange={setTimeframe}
             totalCount={totalMasterCount}
-            filteredCount={totalCount}
+            filteredCount={stats.total}
           />
         </div>
 
         <StatsBanner
-          total={totalCount}
-          interviews={interviewCount}
-          offers={offerCount}
-          rejected={rejectedCount}
+          total={stats.total}
+          interviews={stats.interviews}
+          offers={stats.offers}
+          rejected={stats.rejected}
         />
 
         <JobForm

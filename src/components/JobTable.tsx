@@ -315,17 +315,22 @@ export default function JobTable({
 
   // Distinct statuses from user settings + any existing jobs (memoized to keep stable reference)
   const allKnownStatuses = useMemo(() => {
-    return Array.from(new Set([...statuses, ...jobs.map((j) => j.status)]));
+    const set = new Set(statuses);
+    for (let i = 0; i < jobs.length; i++) {
+      set.add(jobs[i].status);
+    }
+    return Array.from(set);
   }, [statuses, jobs]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { All: jobs.length };
-    allKnownStatuses.forEach((s) => {
-      counts[s] = 0;
-    });
-    jobs.forEach((job) => {
-      counts[job.status] = (counts[job.status] || 0) + 1;
-    });
+    for (let i = 0; i < allKnownStatuses.length; i++) {
+      counts[allKnownStatuses[i]] = 0;
+    }
+    for (let i = 0; i < jobs.length; i++) {
+      const s = jobs[i].status;
+      counts[s] = (counts[s] || 0) + 1;
+    }
     return counts;
   }, [allKnownStatuses, jobs]);
 
