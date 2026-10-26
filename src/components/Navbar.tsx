@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import AuthModal from "@/components/AuthModal";
 import AccountModal from "@/components/AccountModal";
+import ContactModal from "@/components/ContactModal";
 import type { JobApplication } from "@/types/job";
 
 interface NavbarProps {
@@ -22,6 +23,7 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -240,6 +242,20 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
                         </svg>
                         Account Settings
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          setIsContactModalOpen(true);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors cursor-pointer text-left"
+                      >
+                        <svg className="w-4 h-4 text-[#8b949e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
+                        Contact Us
+                      </button>
                     </div>
 
                     <div className="border-t border-[#30363d]/80 pt-1">
@@ -261,12 +277,22 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
                 )}
               </div>
             ) : (
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="text-xs font-medium text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] px-3 py-1.5 rounded-md transition-colors cursor-pointer"
-              >
-                Sign In
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsContactModalOpen(true)}
+                  className="text-xs font-medium text-[#8b949e] hover:text-[#c9d1d9] px-2 py-1.5 transition-colors cursor-pointer"
+                >
+                  Contact
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="text-xs font-medium text-[#c9d1d9] hover:text-white bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] px-3 py-1.5 rounded-md transition-colors cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -276,6 +302,10 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
       <AccountModal
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
+      />
+      <ContactModal
+        isOpen={isContactModalOpen}
+        onClose={() => setIsContactModalOpen(false)}
       />
     </>
   );
