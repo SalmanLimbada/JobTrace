@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useDeferredValue } from "react";
+import dynamic from "next/dynamic";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { exportApplicationsToCSV } from "@/lib/csv";
-import CSVImportModal from "@/components/CSVImportModal";
 import EditJobModal from "@/components/EditJobModal";
-import ExportCSVModal from "@/components/ExportCSVModal";
-import CleanUpModal from "@/components/CleanUpModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import SimpleRequirementsDrawer from "@/components/SimpleRequirementsDrawer";
 import NoteDrawer, { type NoteDrawerItem } from "@/components/NoteDrawer";
@@ -16,6 +14,11 @@ import {
   STANDARD_COLUMN_NAMES,
   type StandardColumnsSettings,
 } from "@/context/SettingsContext";
+
+// Lazy-load utility modals that are not needed on initial page view
+const CSVImportModal = dynamic(() => import("@/components/CSVImportModal"));
+const ExportCSVModal = dynamic(() => import("@/components/ExportCSVModal"));
+const CleanUpModal = dynamic(() => import("@/components/CleanUpModal"));
 
 const STORAGE_SORT_KEY = "jobtrace_table_sort";
 const INITIAL_BATCH = 60;
@@ -1534,28 +1537,34 @@ export default function JobTable({
         }}
       />
 
-      <CSVImportModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onImport={onImportJobs}
-      />
+      {isImportModalOpen && (
+        <CSVImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onImport={onImportJobs}
+        />
+      )}
 
-      <ExportCSVModal
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-        allJobs={jobs}
-        filteredJobs={sortedJobs}
-        customFields={customFields}
-      />
+      {isExportModalOpen && (
+        <ExportCSVModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          allJobs={jobs}
+          filteredJobs={sortedJobs}
+          customFields={customFields}
+        />
+      )}
 
-      <CleanUpModal
-        isOpen={isCleanUpModalOpen}
-        onClose={() => setIsCleanUpModalOpen(false)}
-        jobs={jobs}
-        onDeleteJobs={onDeleteJobs}
-        onDeleteJob={onDeleteJob}
-        statuses={statuses}
-      />
+      {isCleanUpModalOpen && (
+        <CleanUpModal
+          isOpen={isCleanUpModalOpen}
+          onClose={() => setIsCleanUpModalOpen(false)}
+          jobs={jobs}
+          onDeleteJobs={onDeleteJobs}
+          onDeleteJob={onDeleteJob}
+          statuses={statuses}
+        />
+      )}
 
       <ConfirmModal
         isOpen={!!jobToDelete}
