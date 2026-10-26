@@ -22,7 +22,6 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  const [accountModalTab, setAccountModalTab] = useState<"email" | "password">("email");
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -228,46 +227,18 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
                     </div>
 
                     <div className="py-1">
-                      <Link
-                        href="/settings"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors cursor-pointer text-left"
-                      >
-                        <svg className="w-4 h-4 text-[#8b949e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Settings & Preferences
-                      </Link>
-
                       <button
                         type="button"
                         onClick={() => {
                           setIsProfileOpen(false);
-                          setAccountModalTab("email");
                           setIsAccountModalOpen(true);
                         }}
                         className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors cursor-pointer text-left"
                       >
                         <svg className="w-4 h-4 text-[#8b949e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
-                        Change Email
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsProfileOpen(false);
-                          setAccountModalTab("password");
-                          setIsAccountModalOpen(true);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors cursor-pointer text-left"
-                      >
-                        <svg className="w-4 h-4 text-[#8b949e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                        Change Password
+                        Account Settings
                       </button>
                     </div>
 
@@ -305,7 +276,6 @@ export default function Navbar({ jobs = [], onMigrateStatus }: NavbarProps) {
       <AccountModal
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
-        defaultTab={accountModalTab}
       />
     </>
   );
