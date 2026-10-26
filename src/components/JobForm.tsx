@@ -24,9 +24,10 @@ export interface NewJobPayload {
 interface JobFormProps {
   onAddJob: (payload: NewJobPayload) => void;
   existingJobs?: JobApplication[];
+  onOpenJob?: (job: JobApplication) => void;
 }
 
-export default function JobForm({ onAddJob, existingJobs }: JobFormProps) {
+export default function JobForm({ onAddJob, existingJobs, onOpenJob }: JobFormProps) {
   const { customFields, statuses, standardColumns, columnOrder } = useSettings();
 
   const [company, setCompany] = useState("");
@@ -245,18 +246,32 @@ export default function JobForm({ onAddJob, existingJobs }: JobFormProps) {
       </h2>
 
       {duplicateJob && (
-        <div className="mb-3.5 flex items-start gap-2.5 p-3 rounded-lg bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs">
-          <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div>
-            <span className="font-semibold block text-amber-300">
-              Already applied to this job!
-            </span>
-            <span>
-              {formatDuplicateMessage(duplicateJob, targetJobId)}
-            </span>
+        <div className="mb-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <span className="font-semibold block text-amber-300">
+                Already applied to this job!
+              </span>
+              <span>
+                {formatDuplicateMessage(duplicateJob, targetJobId)}
+              </span>
+            </div>
           </div>
+          {onOpenJob && (
+            <button
+              type="button"
+              onClick={() => onOpenJob(duplicateJob)}
+              className="shrink-0 self-start sm:self-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 hover:text-white font-medium border border-amber-400/40 transition-colors cursor-pointer text-xs"
+            >
+              <span>View Application</span>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
 

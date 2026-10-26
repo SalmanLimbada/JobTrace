@@ -20,6 +20,7 @@ export default function Home() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { timeframe, setTimeframe } = useSettings();
   const [jobs, setJobs] = useState<Record<string, JobApplication>>({});
+  const [editingJob, setEditingJob] = useState<JobApplication | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const hasLoadedRef = useRef(false);
@@ -699,7 +700,11 @@ export default function Home() {
           rejected={rejectedCount}
         />
 
-        <JobForm onAddJob={handleAddJob} existingJobs={jobList} />
+        <JobForm
+          onAddJob={handleAddJob}
+          existingJobs={jobList}
+          onOpenJob={(job) => setEditingJob(job)}
+        />
 
         {isLoading ? (
           <div className="p-12 text-center text-[#8b949e]">
@@ -714,6 +719,8 @@ export default function Home() {
             onDeleteJob={handleDeleteJob}
             onDeleteJobs={handleDeleteJobs}
             onImportJobs={handleImportJobs}
+            editingJob={editingJob}
+            onEditJob={setEditingJob}
           />
         )}
       </main>

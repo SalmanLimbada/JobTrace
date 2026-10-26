@@ -29,6 +29,8 @@ interface JobTableProps {
   onDeleteJob: (id: string) => Promise<void> | void;
   onDeleteJobs?: (ids: string[], isAll?: boolean) => Promise<void> | void;
   onImportJobs: (newJobs: Record<string, JobApplication>, count: number) => void;
+  editingJob?: JobApplication | null;
+  onEditJob?: (job: JobApplication | null) => void;
 }
 
 function formatUrl(rawUrl: string): string | null {
@@ -138,6 +140,8 @@ export default function JobTable({
   onDeleteJob,
   onDeleteJobs,
   onImportJobs,
+  editingJob: editingJobProp,
+  onEditJob,
 }: JobTableProps) {
   const router = useRouter();
   const {
@@ -169,7 +173,15 @@ export default function JobTable({
   }, []);
 
   const [filterStatus, setFilterStatus] = useState<string>("All");
-  const [editingJob, setEditingJob] = useState<JobApplication | null>(null);
+  const [internalEditingJob, setInternalEditingJob] = useState<JobApplication | null>(null);
+  const editingJob = editingJobProp !== undefined ? editingJobProp : internalEditingJob;
+  const setEditingJob = (job: JobApplication | null) => {
+    if (onEditJob) {
+      onEditJob(job);
+    } else {
+      setInternalEditingJob(job);
+    }
+  };
   const [selectedRequirementsJob, setSelectedRequirementsJob] = useState<JobApplication | null>(null);
   const [viewingDetail, setViewingDetail] = useState<NoteDrawerItem | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -766,6 +778,78 @@ export default function JobTable({
     }
   }
 
+  function renderEmptyContent() {
+    const isFiltered = Boolean(searchQuery.trim() || filterStatus !== "All");
+
+    if (jobs.length === 0) {
+      return (
+        <div className="py-12 px-4 text-center">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-400">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+          </div>
+          <p className="text-sm font-semibold text-zinc-200 mb-1">No applications tracked yet</p>
+          <p className="text-xs text-zinc-400 max-w-sm mx-auto mb-4">
+            Add your first application using the form above, or import an existing CSV file.
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const input = document.getElementById("new-job-company-input");
+                input?.focus();
+                input?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+              className="px-3.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-900 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              + Add Application
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-medium transition-colors cursor-pointer"
+            >
+              Import CSV
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="py-10 px-4 text-center">
+        <div className="w-11 h-11 mx-auto mb-3 rounded-full bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-400">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <p className="text-sm font-semibold text-zinc-200 mb-1">No matching applications</p>
+        <p className="text-xs text-zinc-400 max-w-sm mx-auto mb-4">
+          {searchQuery.trim()
+            ? `No jobs match "${searchQuery}"${filterStatus !== "All" ? ` with status "${filterStatus}"` : ""}.`
+            : `No applications currently have status "${filterStatus}".`}
+        </p>
+        {isFiltered && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery("");
+              setFilterStatus("All");
+              searchInputRef.current?.focus();
+            }}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white border border-zinc-700 text-xs font-medium transition-colors cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span>Clear search & filters</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Search & Status Filter Toolbar */}
@@ -1100,20 +1184,8 @@ export default function JobTable({
       {(!isMounted || (isMobileScreen && mobileView === "cards")) && (
         <div className="sm:hidden space-y-2.5 mb-4 -mx-1 sm:mx-0">
           {sortedJobs.length === 0 ? (
-            <div className="p-8 text-center text-zinc-500 text-xs border border-[#30363d] bg-[#161b22]/40 rounded-xl">
-              No job applications found matching your criteria.
-              {(searchQuery || filterStatus !== "All") && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setFilterStatus("All");
-                  }}
-                  className="block mx-auto mt-2 text-xs text-blue-400 hover:underline cursor-pointer"
-                >
-                  Clear search and filters
-                </button>
-              )}
+            <div className="border border-[#30363d] bg-[#161b22]/40 rounded-xl">
+              {renderEmptyContent()}
             </div>
           ) : (
             visibleJobs.map((job, index) => {
@@ -1322,21 +1394,9 @@ export default function JobTable({
                 <tr>
                   <td
                     colSpan={totalColumnCount}
-                    className="p-8 text-center text-zinc-500 text-sm"
+                    className="p-4"
                   >
-                    No job applications found matching your criteria.
-                    {(searchQuery || filterStatus !== "All") && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSearchQuery("");
-                          setFilterStatus("All");
-                        }}
-                        className="block mx-auto mt-2 text-xs text-blue-400 hover:underline cursor-pointer"
-                      >
-                        Clear search and filters
-                      </button>
-                    )}
+                    {renderEmptyContent()}
                   </td>
                 </tr>
               ) : (
