@@ -38,6 +38,17 @@ function scrapePageDetails() {
       let t = decodeHTMLEntities(title);
       t = t.replace(/^[\s•–—\-:|]+|[\s•–—\-:|]+$/g, "").trim();
       t = t.replace(/\bCo\s*-\s*op\b/gi, "Co-op");
+
+      // Strip leading noise (e.g. "Job Application for...", "Hiring for...", "Position: ")
+      t = t.replace(/^(?:job\s+application\s+for|opening\s+for|hiring\s+for|position:?|role:?)\s+/i, "");
+
+      // Strip trailing requisition or job IDs (e.g. "(JR-102948)", "- Req ID 84920", "#1293849", "Req #12345")
+      t = t.replace(/\s*[\(\[\-–—|•]?\s*(?:req(?:uisition)?(?:\s*id)?|job\s*id|jr)[\s#:]*[\w-]+[\)\]]?$/i, "");
+
+      // Strip trailing ATS site tags (e.g. "| Careers", "- Apply Now", "| Workday", "| Greenhouse")
+      t = t.replace(/\s*(?:\||\/\/|—|–|-)\s*(?:careers?(?:\s+at\s+[\w\s&]+)?|jobs?|apply(?:\s+now)?|workday|greenhouse|lever|ashby|smartrecruiters|indeed|linkedin)$/i, "");
+
+      t = t.replace(/^[\s•–—\-:|]+|[\s•–—\-:|]+$/g, "").trim();
       return t;
     }
 
@@ -907,6 +918,7 @@ let isLocationActive = true;
 let isUrlActive = true;
 let isNotesActive = true;
 let currentJobId = "";
+let currentTabUrl = "";
 
 function extractJobIdFromUrl(rawUrl) {
   if (!rawUrl || typeof rawUrl !== "string") return null;
@@ -1211,48 +1223,12 @@ function findBestMatchingCompany(scrapedCompany, existingApplications = []) {
   return candidates[0].name;
 }
 
-function isDuplicateJob(target, existing) {
-  // 1. Role mismatch check:
-  // If BOTH applications specify a role, and the roles are distinctly different,
-  // they are separate positions and cannot be duplicates.
-  const tRole = cleanRole(target.role);
-  const eRole = cleanRole(existing.role);
-  if (tRole && eRole && tRole !== eRole) {
-    return false;
-  }
-
-  // 2. Date difference check:
-  // Duplicates are only relevant within a recent window (last ~3 months / 90 days).
-  const tDate = target.appliedDate || target.applied_date || getLocalDateString();
-  const eDate = existing.appliedDate || existing.applied_date;
-  if (eDate) {
-    const diffDays = getDaysBetween(tDate, eDate);
-    if (diffDays !== null && diffDays > MAX_DUPLICATE_DAYS) {
-      return false;
-    }
-  }
+function findDuplicateJob(target, existingList) {
+  if (!Array.isArray(existingList) || existingList.length === 0) return null;
 
   const tComp = cleanStr(target.company);
-  const eComp = cleanStr(existing.company);
-
-  if (
-    tComp &&
-    eComp &&
-    tComp !== eComp &&
-    !tComp.includes(eComp) &&
-    !eComp.includes(tComp) &&
-    cleanCompanyForMatch(target.company) !== cleanCompanyForMatch(existing.company) &&
-    !areKnownAliases(target.company, existing.company)
-  ) {
-    return false;
-  }
-
-  // 3. Direct URL match
+  const tRole = cleanRole(target.role);
   const tUrl = cleanUrl(target.url);
-  const eUrl = cleanUrl(existing.url);
-  if (tUrl && eUrl && tUrl === eUrl) return true;
-
-  // 4. Job ID check
   const tId = (
     target.jobId ||
     target.customFields?.jobId ||
@@ -1261,44 +1237,70 @@ function isDuplicateJob(target, existing) {
     ""
   ).trim().toUpperCase();
 
-  const eId = (getEffectiveJobId(existing) || "").trim().toUpperCase();
+  const tDate = target.appliedDate || target.applied_date || getLocalDateString();
 
-  if (tId && eId) {
-    if (tId === eId) {
-      const isPureDigits = /^\d+$/.test(tId);
-      if (isPureDigits) {
-        const compMatch = !tComp || !eComp || tComp.includes(eComp) || eComp.includes(tComp);
-        const roleMatch = !tRole || !eRole || tRole === eRole;
-        if (compMatch || roleMatch) return true;
+  for (const existing of existingList) {
+    const eUrl = cleanUrl(existing.url);
+    const eId = (getEffectiveJobId(existing) || "").trim().toUpperCase();
+    const eComp = cleanStr(existing.company);
+    const eRole = cleanRole(existing.role);
+    const eDate = existing.appliedDate || existing.applied_date;
+
+    // 1. Direct URL match (Exact match)
+    if (tUrl && eUrl && tUrl === eUrl) {
+      return { job: existing, matchType: "exact" };
+    }
+
+    // 2. Job / Requisition ID check
+    if (tId && eId) {
+      if (tId === eId) {
+        const isPureDigits = /^\d+$/.test(tId);
+        if (isPureDigits) {
+          const compMatch = !tComp || !eComp || tComp.includes(eComp) || eComp.includes(tComp);
+          const roleMatch = !tRole || !eRole || tRole === eRole;
+          if (compMatch || roleMatch) return { job: existing, matchType: "exact" };
+        } else {
+          return { job: existing, matchType: "exact" };
+        }
       } else {
-        return true;
+        // Distinct Job IDs = different requisitions. If company & role match, it's a similar opening.
+        const compMatch = tComp && eComp && (
+          tComp === eComp ||
+          cleanCompanyForMatch(target.company) === cleanCompanyForMatch(existing.company) ||
+          areKnownAliases(target.company, existing.company)
+        );
+        if (compMatch && tRole && eRole && tRole === eRole) {
+          return { job: existing, matchType: "similar" };
+        }
+        continue;
       }
-    } else {
-      // Both jobs provide distinct Job/Requisition IDs; they represent separate openings
-      return false;
+    }
+
+    // 3. Exact Company + Role match (within MAX_DUPLICATE_DAYS)
+    const compMatch = tComp && eComp && (
+      tComp === eComp ||
+      cleanCompanyForMatch(target.company) === cleanCompanyForMatch(existing.company) ||
+      areKnownAliases(target.company, existing.company)
+    );
+
+    if (compMatch && tRole && eRole && tRole === eRole) {
+      if (eDate) {
+        const diffDays = getDaysBetween(tDate, eDate);
+        if (diffDays !== null && diffDays > MAX_DUPLICATE_DAYS) {
+          continue;
+        }
+      }
+      return { job: existing, matchType: "similar" };
     }
   }
 
-  // 5. Exact Company + Role match
-  if (tComp && eComp && tRole && eRole) {
-    if (tComp === eComp && tRole === eRole) return true;
-  }
-
-  return false;
-}
-
-function findDuplicateJob(target, existingList) {
-  if (!Array.isArray(existingList)) return null;
-  for (const job of existingList) {
-    if (isDuplicateJob(target, job)) return job;
-  }
   return null;
 }
 
 function checkDuplicate() {
   const company = document.getElementById("company")?.value || "";
   const role = document.getElementById("role")?.value || "";
-  const url = document.getElementById("url")?.value || "";
+  const url = document.getElementById("url")?.value || currentTabUrl || "";
   const jobId = currentJobId;
 
   const duplicateBanner = document.getElementById("duplicateBanner");
@@ -1307,22 +1309,35 @@ function checkDuplicate() {
 
   if (!duplicateBanner || !duplicateBannerText) return;
 
-  const dup = findDuplicateJob(
+  const dupResult = findDuplicateJob(
     { company, role, url, jobId, appliedDate: getLocalDateString() },
     cachedApplications
   );
-  if (dup) {
+
+  if (dupResult) {
+    const { job: dup, matchType } = dupResult;
     const proofDate = formatDateDisplay(dup.appliedDate || dup.applied_date);
     const displayId = getEffectiveJobId(dup);
-    if (displayId) {
-      duplicateBannerText.textContent = `This was already applied to (ID: ${displayId}) [Applied: ${proofDate}]`;
+    const titleSpan = duplicateBanner.querySelector(".duplicate-banner-title span");
+
+    if (matchType === "exact") {
+      if (titleSpan) titleSpan.textContent = "Already Applied";
+      if (displayId) {
+        duplicateBannerText.textContent = `You applied to this exact posting on ${proofDate} (ID: ${displayId}).`;
+      } else {
+        duplicateBannerText.textContent = `You applied to this exact posting on ${proofDate}.`;
+      }
+      if (saveBtn) {
+        saveBtn.textContent = "Already Applied — Save Anyway";
+      }
     } else {
-      duplicateBannerText.textContent = `This was already applied to [Applied: ${proofDate}]`;
+      if (titleSpan) titleSpan.textContent = "Possible Duplicate";
+      duplicateBannerText.textContent = `You previously applied for ${dup.role || "this role"} at ${dup.company || "this company"} on ${proofDate}.`;
+      if (saveBtn && !saveBtn.disabled) {
+        saveBtn.textContent = "Save to JobTrace";
+      }
     }
     duplicateBanner.style.display = "block";
-    if (saveBtn) {
-      saveBtn.textContent = "Already Applied — Save Anyway";
-    }
   } else {
     duplicateBanner.style.display = "none";
     if (saveBtn && !saveBtn.disabled) {
@@ -1809,6 +1824,8 @@ async function captureActiveTab() {
       return;
     }
 
+    currentTabUrl = tab.url;
+
     // Default URL to tab URL if target enabled
     const urlInput = document.getElementById("url");
     if (urlInput && isUrlActive && tab.url) urlInput.value = tab.url;
@@ -1877,9 +1894,26 @@ async function submitApplication() {
   const urlInput = document.getElementById("url");
   const notesInput = document.getElementById("notes");
 
-  if (!companyInput.value.trim() || !roleInput.value.trim()) {
+  const trimmedComp = companyInput.value.trim();
+  const trimmedRole = roleInput.value.trim();
+
+  if (!trimmedComp || !trimmedRole) {
     statusMsg.className = "status-msg error";
     statusMsg.textContent = "Company and Role are required.";
+    return;
+  }
+
+  if (/^(careers?|jobs?|apply|job search|candidate portal|welcome|dashboard)$/i.test(trimmedComp)) {
+    statusMsg.className = "status-msg error";
+    statusMsg.textContent = "Please enter a valid Company name.";
+    companyInput.focus();
+    return;
+  }
+
+  if (/^(careers?|jobs?|apply|job application|job description|candidate portal)$/i.test(trimmedRole)) {
+    statusMsg.className = "status-msg error";
+    statusMsg.textContent = "Please enter a valid Role / Title.";
+    roleInput.focus();
     return;
   }
 
