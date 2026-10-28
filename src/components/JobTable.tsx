@@ -60,58 +60,105 @@ function getFieldValue(job: JobApplication, fieldId: string): string | undefined
   return undefined;
 }
 
-function getStatusBadgeStyle(status: string): string {
-  switch (status.toLowerCase()) {
+export type StatusColorFamily =
+  | "applied"
+  | "interview"
+  | "offer"
+  | "rejected"
+  | "purple"
+  | "cyan"
+  | "pink"
+  | "teal"
+  | "indigo"
+  | "coral"
+  | "other";
+
+const CUSTOM_COLOR_CYCLE: StatusColorFamily[] = [
+  "purple",
+  "cyan",
+  "pink",
+  "teal",
+  "indigo",
+  "coral",
+];
+
+export function getStatusColorFamily(status: string): StatusColorFamily {
+  const s = (status || "").trim().toLowerCase();
+  if (s === "applied") return "applied";
+  if (s === "interview" || s === "phone screen" || s === "technical screen" || s === "behavioral") return "interview";
+  if (s === "offer") return "offer";
+  if (s === "rejected" || s === "withdrawn") return "rejected";
+  if (s === "other") return "other";
+
+  // Semantic keyword heuristics for common recruitment stages
+  if (s.includes("screen") || s.includes("hr") || s.includes("recruiter") || s.includes("review") || s.includes("shortlist")) {
+    return "purple";
+  }
+  if (s.includes("assess") || s.includes("oa") || s.includes("test") || s.includes("task") || s.includes("take-home") || s.includes("assignment") || s.includes("coding") || s.includes("quiz")) {
+    return "cyan";
+  }
+  if (s.includes("negotiat") || s.includes("final") || s.includes("executive")) {
+    return "pink";
+  }
+  if (s.includes("refer") || s.includes("sourced") || s.includes("contact")) {
+    return "teal";
+  }
+  if (s.includes("hold") || s.includes("wait") || s.includes("pending")) {
+    return "indigo";
+  }
+
+  // Deterministic hash so any user custom status gets a stable, unique color from the unused palette
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    hash = (hash << 5) - hash + s.charCodeAt(i);
+    hash |= 0;
+  }
+  const index = Math.abs(hash) % CUSTOM_COLOR_CYCLE.length;
+  return CUSTOM_COLOR_CYCLE[index];
+}
+
+export function getStatusBadgeStyle(status: string): string {
+  const family = getStatusColorFamily(status);
+  switch (family) {
     case "applied":
       return "status-badge-applied bg-[#58a6ff]/15 text-[#58a6ff] border-[#58a6ff]/35 hover:bg-[#58a6ff]/25";
     case "interview":
-    case "oa / assessment":
-    case "phone screen":
-    case "technical screen":
-    case "behavioral":
       return "status-badge-interview bg-[#d29922]/15 text-[#d29922] border-[#d29922]/35 hover:bg-[#d29922]/25";
     case "offer":
       return "status-badge-offer bg-[#3fb950]/15 text-[#3fb950] border-[#3fb950]/35 hover:bg-[#3fb950]/25";
     case "rejected":
-    case "withdrawn":
       return "status-badge-rejected bg-[#f85149]/15 text-[#f85149] border-[#f85149]/35 hover:bg-[#f85149]/25";
+    case "purple":
+      return "status-badge-purple bg-[#bc8cff]/15 text-[#bc8cff] border-[#bc8cff]/35 hover:bg-[#bc8cff]/25";
+    case "cyan":
+      return "status-badge-cyan bg-[#39c5cf]/15 text-[#39c5cf] border-[#39c5cf]/35 hover:bg-[#39c5cf]/25";
+    case "pink":
+      return "status-badge-pink bg-[#f778ba]/15 text-[#f778ba] border-[#f778ba]/35 hover:bg-[#f778ba]/25";
+    case "teal":
+      return "status-badge-teal bg-[#2dd4bf]/15 text-[#2dd4bf] border-[#2dd4bf]/35 hover:bg-[#2dd4bf]/25";
+    case "indigo":
+      return "status-badge-indigo bg-[#818cf8]/15 text-[#818cf8] border-[#818cf8]/35 hover:bg-[#818cf8]/25";
+    case "coral":
+      return "status-badge-coral bg-[#fb923c]/15 text-[#fb923c] border-[#fb923c]/35 hover:bg-[#fb923c]/25";
     default:
       return "status-badge-other bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-500";
   }
 }
 
 export function getStatusOptionClass(status: string): string {
-  switch (status.toLowerCase()) {
-    case "applied":
-      return "status-option-applied";
-    case "interview":
-    case "oa / assessment":
-    case "phone screen":
-    case "technical screen":
-    case "behavioral":
-      return "status-option-interview";
-    case "offer":
-      return "status-option-offer";
-    case "rejected":
-    case "withdrawn":
-      return "status-option-rejected";
-    default:
-      return "status-option-other";
-  }
+  const family = getStatusColorFamily(status);
+  return `status-option-${family}`;
 }
 
 function getRowStatusStyle(status: string): { borderClass: string; dimClass: string } {
-  switch (status.toLowerCase()) {
+  const family = getStatusColorFamily(status);
+  switch (family) {
     case "offer":
       return {
         borderClass: "border-l-2 border-l-[#3fb950] row-border-offer",
         dimClass: "hover:bg-[#3fb950]/5",
       };
     case "interview":
-    case "oa / assessment":
-    case "phone screen":
-    case "technical screen":
-    case "behavioral":
       return {
         borderClass: "border-l-2 border-l-[#d29922] row-border-interview",
         dimClass: "hover:bg-[#d29922]/5",
@@ -122,10 +169,39 @@ function getRowStatusStyle(status: string): { borderClass: string; dimClass: str
         dimClass: "hover:bg-[#58a6ff]/5",
       };
     case "rejected":
-    case "withdrawn":
       return {
         borderClass: "border-l-2 border-l-[#f85149]/40 row-border-rejected",
         dimClass: "opacity-65 hover:opacity-100",
+      };
+    case "purple":
+      return {
+        borderClass: "border-l-2 border-l-[#bc8cff] row-border-purple",
+        dimClass: "hover:bg-[#bc8cff]/5",
+      };
+    case "cyan":
+      return {
+        borderClass: "border-l-2 border-l-[#39c5cf] row-border-cyan",
+        dimClass: "hover:bg-[#39c5cf]/5",
+      };
+    case "pink":
+      return {
+        borderClass: "border-l-2 border-l-[#f778ba] row-border-pink",
+        dimClass: "hover:bg-[#f778ba]/5",
+      };
+    case "teal":
+      return {
+        borderClass: "border-l-2 border-l-[#2dd4bf] row-border-teal",
+        dimClass: "hover:bg-[#2dd4bf]/5",
+      };
+    case "indigo":
+      return {
+        borderClass: "border-l-2 border-l-[#818cf8] row-border-indigo",
+        dimClass: "hover:bg-[#818cf8]/5",
+      };
+    case "coral":
+      return {
+        borderClass: "border-l-2 border-l-[#fb923c] row-border-coral",
+        dimClass: "hover:bg-[#fb923c]/5",
       };
     default:
       return {

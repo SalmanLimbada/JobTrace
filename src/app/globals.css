@@ -181,6 +181,30 @@ html[data-theme="light"] .status-badge-other:hover {
   background-color: #161b22 !important;
   color: #f85149 !important;
 }
+.status-option-purple {
+  background-color: #161b22 !important;
+  color: #bc8cff !important;
+}
+.status-option-cyan {
+  background-color: #161b22 !important;
+  color: #39c5cf !important;
+}
+.status-option-pink {
+  background-color: #161b22 !important;
+  color: #f778ba !important;
+}
+.status-option-teal {
+  background-color: #161b22 !important;
+  color: #2dd4bf !important;
+}
+.status-option-indigo {
+  background-color: #161b22 !important;
+  color: #818cf8 !important;
+}
+.status-option-coral {
+  background-color: #161b22 !important;
+  color: #fb923c !important;
+}
 .status-option-other {
   background-color: #161b22 !important;
   color: #c9d1d9 !important;
@@ -202,9 +226,33 @@ html[data-theme="light"] .status-option-rejected {
   background-color: #ffffff !important;
   color: #cf222e !important;
 }
-html[data-theme="light"] .status-option-other {
+html[data-theme="light"] .status-option-purple {
   background-color: #ffffff !important;
-  color: #57606a !important;
+  color: #8250df !important;
+}
+html[data-theme="light"] .status-option-cyan {
+  background-color: #ffffff !important;
+  color: #0284c7 !important;
+}
+html[data-theme="light"] .status-option-pink {
+  background-color: #ffffff !important;
+  color: #bf3989 !important;
+}
+html[data-theme="light"] .status-option-teal {
+  background-color: #ffffff !important;
+  color: #0d9488 !important;
+}
+html[data-theme="light"] .status-option-indigo {
+  background-color: #ffffff !important;
+  color: #4f46e5 !important;
+}
+html[data-theme="light"] .status-option-coral {
+  background-color: #ffffff !important;
+  color: #c2410c !important;
+}
+.status-option-other {
+  background-color: #161b22 !important;
+  color: #c9d1d9 !important;
 }
 
 html[data-theme="light"] .status-badge-select option {

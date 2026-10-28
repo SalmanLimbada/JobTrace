@@ -47,6 +47,10 @@ function isValidRole(title) {
   if (!hasBalancedParens(t)) return false;
   if (JUNK_ROLE_REGEX.test(t)) return false;
   if (/^(search(?:\s+for)?\s+jobs?|sign\s+in|log\s+in|candidate\s+home)$/i.test(t)) return false;
+  if (/\b(?:careers?|jobs?|portal|candidate\s*home|my\s*tasks)\b/i.test(t) &&
+      !/\b(engineer|developer|intern|internship|co-?op|manager|analyst|specialist|designer|scientist|lead|consultant|technician|coordinator|associate|director|vp|head|officer|assistant|recruiter|accountant)\b/i.test(t)) {
+    return false;
+  }
   return true;
 }
 
@@ -231,10 +235,16 @@ function cleanUrl(u) {
     return u.trim().toLowerCase();
   }
 }
+function isCandidatePortalUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return false;
+  return /\/(?:userHome|candidateHome|myTasks|myApplications|login|dashboard)\b/i.test(rawUrl);
+}
+
 function extractJobId(rawUrl) {
   if (!rawUrl || typeof rawUrl !== "string") return null;
   const url = rawUrl.trim();
   if (url === "#" || url === "" || url.toLowerCase() === "n/a") return null;
+  if (isCandidatePortalUrl(url)) return null;
 
   const reqMatch = url.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i);
   if (reqMatch) return reqMatch[1].toUpperCase();
@@ -259,8 +269,14 @@ function extractJobId(rawUrl) {
   const liMatch = url.match(/\/jobs\/view\/(\d{6,})/i);
   if (liMatch) return liMatch[1];
 
-  const wdSlugMatch = url.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/);
-  if (wdSlugMatch) return wdSlugMatch[1].toUpperCase();
+  const wdPostingMatch = url.match(/\/(?:job|details|posting)\/[^?#]*_([A-Za-z0-9]{5,})(?:[/?#]|$)/i) ||
+    url.match(/_(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,}|\d{5,})(?:[/?#]|$)/i);
+  if (wdPostingMatch) {
+    const candidateId = wdPostingMatch[1].toUpperCase();
+    if (!/^(CAREERS?|JOBS?|PORTAL|SEARCH|HOME|WELCOME|CANDIDATES?|APPLY|EXTERNAL|INTERNAL|TEAM|TASKS?)$/i.test(candidateId)) {
+      return candidateId;
+    }
+  }
 
   const workableMatch = url.match(/\/j\/([A-Za-z0-9]{8,})(?:[/?#]|$)/i);
   if (workableMatch) return workableMatch[1].toUpperCase();
@@ -346,5 +362,10 @@ const workdaySaved = [
 ];
 const d5 = testFindDuplicate({ url: "https://rakuten.wd1.myworkdayjobs.com/en-US/Kobo/job/Toronto-Canada/eReader-Quality-Assurance-Intern--12-month-contract-_1039072", company: "Rakuten", role: "eReader Quality Assurance Intern" }, workdaySaved);
 assert.equal(d5?.matchType, "exact", "Workday slug 1039072 should match exact jobId");
+
+// Test 5G: Candidate Portal safety (no fake duplicate, no ID: CAREERS)
+assert.equal(isCandidatePortalUrl("https://td.wd3.myworkdayjobs.com/en-US/TD_Bank_Careers/userHome"), true, "Should identify userHome as portal");
+assert.equal(extractJobId("https://td.wd3.myworkdayjobs.com/en-US/TD_Bank_Careers/userHome"), null, "Portal URL must not extract CAREERS as Job ID");
+assert.equal(isValidRole("TD Careers"), false, "TD Careers must be rejected as role");
 
 console.log("All parser check tests passed successfully!");

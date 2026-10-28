@@ -99,6 +99,11 @@ function scrapePageDetails() {
       if (!hasBalancedParens(t)) return false;
       if (JUNK_ROLE_REGEX.test(t)) return false;
       if (/^(search(?:\s+for)?\s+jobs?|sign\s+in|log\s+in|candidate\s+home)$/i.test(t)) return false;
+      // Reject site/portal names like "TD Careers", "Candidate Home", "My Tasks"
+      if (/\b(?:careers?|jobs?|portal|candidate\s*home|my\s*tasks)\b/i.test(t) &&
+          !/\b(engineer|developer|intern|internship|co-?op|manager|analyst|specialist|designer|scientist|lead|consultant|technician|coordinator|associate|director|vp|head|officer|assistant|recruiter|accountant)\b/i.test(t)) {
+        return false;
+      }
       return true;
     }
 
@@ -924,10 +929,16 @@ let isNotesActive = true;
 let currentJobId = "";
 let currentTabUrl = "";
 
+function isCandidatePortalUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return false;
+  return /\/(?:userHome|candidateHome|myTasks|myApplications|login|dashboard)\b/i.test(rawUrl);
+}
+
 function extractJobIdFromUrl(rawUrl) {
   if (!rawUrl || typeof rawUrl !== "string") return null;
   const url = rawUrl.trim();
   if (url === "#" || url === "" || url.toLowerCase() === "n/a") return null;
+  if (isCandidatePortalUrl(url)) return null;
 
   // 1. Standard Requisition prefixes (JR102948, REQ-84920, R-12345, R102948)
   const reqMatch = url.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i);
@@ -957,9 +968,15 @@ function extractJobIdFromUrl(rawUrl) {
   const liMatch = url.match(/\/jobs\/view\/(\d{6,})/i);
   if (liMatch) return liMatch[1];
 
-  // 5. Workday slug ending in numeric or alphanumeric ID (e.g. _1039072, _JR12345)
-  const wdSlugMatch = url.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/);
-  if (wdSlugMatch) return wdSlugMatch[1].toUpperCase();
+  // 5. Workday job posting slug (must be in /job/ or /details/, or match specific requisition pattern)
+  const wdPostingMatch = url.match(/\/(?:job|details|posting)\/[^?#]*_([A-Za-z0-9]{5,})(?:[/?#]|$)/i) ||
+    url.match(/_(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,}|\d{5,})(?:[/?#]|$)/i);
+  if (wdPostingMatch) {
+    const candidateId = wdPostingMatch[1].toUpperCase();
+    if (!/^(CAREERS?|JOBS?|PORTAL|SEARCH|HOME|WELCOME|CANDIDATES?|APPLY|EXTERNAL|INTERNAL|TEAM|TASKS?)$/i.test(candidateId)) {
+      return candidateId;
+    }
+  }
 
   // 6. Workable (/j/9A8B7C6D5E)
   const workableMatch = url.match(/\/j\/([A-Za-z0-9]{8,})(?:[/?#]|$)/i);
@@ -1836,6 +1853,13 @@ async function captureActiveTab() {
     if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("edge://") || tab.url.startsWith("chrome-extension://") || tab.url.startsWith("about:")) {
       statusMsg.className = "status-msg info";
       statusMsg.textContent = "Navigate to a job posting tab to capture.";
+      return;
+    }
+
+    // Guard against candidate portal / account home pages
+    if (isCandidatePortalUrl(tab.url)) {
+      statusMsg.className = "status-msg info";
+      statusMsg.textContent = "You are on an account or candidate portal. Open a specific job posting to clip.";
       return;
     }
 

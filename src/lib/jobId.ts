@@ -208,10 +208,16 @@ export function findBestMatchingCompany(
  * Supports Workday (e.g. JR26081665, R-12345), Greenhouse, Lever,
  * LinkedIn, Indeed, and common query parameters (jobId, reqId, etc.).
  */
+export function isCandidatePortalUrl(rawUrl: string | null | undefined): boolean {
+  if (!rawUrl || typeof rawUrl !== "string") return false;
+  return /\/(?:userHome|candidateHome|myTasks|myApplications|login|dashboard)\b/i.test(rawUrl);
+}
+
 export function extractJobIdFromUrl(rawUrl: string | null | undefined): string | null {
   if (!rawUrl || typeof rawUrl !== "string") return null;
   const url = rawUrl.trim();
   if (url === "#" || url === "" || url.toLowerCase() === "n/a") return null;
+  if (isCandidatePortalUrl(url)) return null;
 
   // 1. Explicit enterprise requisition pattern anywhere in path/slug (e.g. JR26081665, REQ-12345, R-12345)
   const reqMatch = url.match(/(?:_|\/|-|\b)(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,})(?:[/?#&_\s]|$)/i);
@@ -238,7 +244,7 @@ export function extractJobIdFromUrl(rawUrl: string | null | undefined): string |
     ];
     for (const [k, v] of parsed.searchParams.entries()) {
       if (qParams.includes(k.toLowerCase()) && v && v.length >= 3) {
-        return v;
+        return v.toUpperCase();
       }
     }
   } catch {}
@@ -251,9 +257,15 @@ export function extractJobIdFromUrl(rawUrl: string | null | undefined): string |
   const liMatch = url.match(/\/jobs\/view\/(\d{6,})/i);
   if (liMatch) return liMatch[1];
 
-  // 5. Workday slug ending in numeric or alphanumeric ID (e.g. _1039072, _JR12345)
-  const wdSlugMatch = url.match(/_([A-Za-z0-9]{5,})(?:[/?#]|$)/);
-  if (wdSlugMatch) return wdSlugMatch[1].toUpperCase();
+  // 5. Workday job posting slug (must be in /job/ or /details/, or match specific requisition pattern)
+  const wdPostingMatch = url.match(/\/(?:job|details|posting)\/[^?#]*_([A-Za-z0-9]{5,})(?:[/?#]|$)/i) ||
+    url.match(/_(JR\d{4,}|REQ-?\d{4,}|R-?\d{4,}|\d{5,})(?:[/?#]|$)/i);
+  if (wdPostingMatch) {
+    const candidateId = wdPostingMatch[1].toUpperCase();
+    if (!/^(CAREERS?|JOBS?|PORTAL|SEARCH|HOME|WELCOME|CANDIDATES?|APPLY|EXTERNAL|INTERNAL|TEAM|TASKS?)$/i.test(candidateId)) {
+      return candidateId;
+    }
+  }
 
   // 6. Workable (/j/9A8B7C6D5E)
   const workableMatch = url.match(/\/j\/([A-Za-z0-9]{8,})(?:[/?#]|$)/i);
