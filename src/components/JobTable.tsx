@@ -228,6 +228,7 @@ export default function JobTable({
     columnOrder,
     reorderColumns,
     statuses,
+    reorderStatuses,
     shortcuts,
     extensionSettings,
     filterStyle,
@@ -292,6 +293,10 @@ export default function JobTable({
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
   const [dragOverSide, setDragOverSide] = useState<"left" | "right">("left");
   const isDraggingRef = useRef(false);
+
+  const [draggedStatusPill, setDraggedStatusPill] = useState<string | null>(null);
+  const [dragOverStatusPill, setDragOverStatusPill] = useState<string | null>(null);
+  const [dragOverStatusSide, setDragOverStatusSide] = useState<"left" | "right">("left");
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -1133,17 +1138,63 @@ export default function JobTable({
               {topStatuses.map((s) => {
                 const isSelected = filterStatus === s;
                 const count = statusCounts[s] || 0;
+                const isDragged = draggedStatusPill === s;
+                const isOver = dragOverStatusPill === s && !isDragged;
 
                 return (
                   <button
                     key={s}
                     type="button"
+                    draggable={true}
+                    onDragStart={(e) => {
+                      setDraggedStatusPill(s);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", s);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (draggedStatusPill && draggedStatusPill !== s) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const midpoint = rect.left + rect.width / 2;
+                        const side = e.clientX < midpoint ? "left" : "right";
+                        setDragOverStatusPill(s);
+                        setDragOverStatusSide(side);
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      if (e.currentTarget === e.target) {
+                        setDragOverStatusPill(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const source = draggedStatusPill || e.dataTransfer.getData("text/plain");
+                      if (source && source !== s) {
+                        reorderStatuses(source, s, dragOverStatusSide);
+                      }
+                      setDraggedStatusPill(null);
+                      setDragOverStatusPill(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedStatusPill(null);
+                      setDragOverStatusPill(null);
+                    }}
                     data-active={isSelected ? "true" : "false"}
                     onClick={() => setFilterStatus(s)}
-                    className={`relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                    title="Click to filter, drag left/right to reorder"
+                    className={`relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap cursor-grab active:cursor-grabbing ${
                       isSelected
                         ? "text-[#f0f6fc] font-semibold"
                         : "text-[#8b949e] hover:text-[#c9d1d9]"
+                    } ${
+                      isDragged
+                        ? "opacity-30 scale-95"
+                        : isOver && dragOverStatusSide === "left"
+                        ? "border-l-2 border-l-[#58a6ff]"
+                        : isOver && dragOverStatusSide === "right"
+                        ? "border-r-2 border-r-[#58a6ff]"
+                        : ""
                     }`}
                   >
                     <span>{s}</span>

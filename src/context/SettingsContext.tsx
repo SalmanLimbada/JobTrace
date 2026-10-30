@@ -139,7 +139,7 @@ interface SettingsContextType {
   editStatus: (oldName: string, newName: string) => boolean;
   removeStatus: (name: string) => void;
   moveStatus: (name: string, direction: "up" | "down") => void;
-  reorderStatuses: (sourceName: string, targetName: string, side?: "above" | "below") => void;
+  reorderStatuses: (sourceName: string, targetName: string, side?: "above" | "below" | "left" | "right") => void;
   resetStatuses: () => void;
   columnOrder: string[];
   reorderColumns: (sourceId: string, targetId: string, side?: "left" | "right") => void;
@@ -731,7 +731,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     scheduleCloudSync({ statuses: next });
   };
 
-  const reorderStatuses = (sourceName: string, targetName: string, side: "above" | "below" = "above") => {
+  const reorderStatuses = (
+    sourceName: string,
+    targetName: string,
+    side: "above" | "below" | "left" | "right" = "above"
+  ) => {
     if (sourceName === targetName) return;
     const sourceIdx = statuses.indexOf(sourceName);
     if (sourceIdx === -1) return;
@@ -739,7 +743,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const [moved] = next.splice(sourceIdx, 1);
     const targetIdx = next.indexOf(targetName);
     if (targetIdx === -1) return;
-    const insertIdx = side === "above" ? targetIdx : targetIdx + 1;
+    const insertIdx = side === "above" || side === "left" ? targetIdx : targetIdx + 1;
     next.splice(insertIdx, 0, moved);
     setStatusesState(next);
     try {

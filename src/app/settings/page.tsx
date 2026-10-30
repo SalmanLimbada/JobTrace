@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import ClearableInput from "@/components/ClearableInput";
+import ConfirmModal from "@/components/ConfirmModal";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 import {
   useSettings,
   STANDARD_COLUMN_NAMES,
@@ -151,6 +153,115 @@ export default function SettingsPage() {
     setEditingFieldId(null);
     setEditFieldName("");
     setEditFieldError("");
+  };
+
+  // Deletion safeguard state for statuses
+  const [deleteTargetStatus, setDeleteTargetStatus] = useState<string | null>(null);
+  const [deleteStatusJobCount, setDeleteStatusJobCount] = useState<number>(0);
+  const [reassignStatus, setReassignStatus] = useState<string>("");
+  const [isDeletingWithSafeguard, setIsDeletingWithSafeguard] = useState<boolean>(false);
+
+  const getJobCountForStatus = async (statusName: string): Promise<number> => {
+    let count = 0;
+    try {
+      const guestData = localStorage.getItem("job_tracker_guest_jobs");
+      if (guestData) {
+        const parsed = JSON.parse(guestData);
+        for (const id in parsed) {
+          if (parsed[id]?.status === statusName) count++;
+        }
+      }
+    } catch {}
+
+    if (!user) return count;
+
+    try {
+      const { count: dbCount, error } = await supabase
+        .from("applications")
+        .select("id", { count: "exact", head: true })
+        .eq("status", statusName)
+        .eq("user_id", user.id);
+      if (!error && typeof dbCount === "number") {
+        return dbCount;
+      }
+    } catch {}
+
+    try {
+      const cached = localStorage.getItem("jobtrace_cached_applications");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed.filter((j: any) => j.status === statusName).length;
+      }
+    } catch {}
+
+    return count;
+  };
+
+  const handleInitiateDeleteStatus = async (statusName: string) => {
+    if (statuses.length <= 1) {
+      setStatusError("You must keep at least one status");
+      return;
+    }
+    const count = await getJobCountForStatus(statusName);
+    setDeleteTargetStatus(statusName);
+    setDeleteStatusJobCount(count);
+    const remaining = statuses.filter((s) => s !== statusName);
+    setReassignStatus(remaining[0] || "");
+  };
+
+  const handleConfirmDeleteStatus = async () => {
+    if (!deleteTargetStatus) return;
+    setIsDeletingWithSafeguard(true);
+    try {
+      if (deleteStatusJobCount > 0 && reassignStatus) {
+        // 1. Migrate applications in guest localStorage
+        try {
+          const guestKey = "job_tracker_guest_jobs";
+          const guestData = localStorage.getItem(guestKey);
+          if (guestData) {
+            const parsed = JSON.parse(guestData);
+            let changed = false;
+            for (const id in parsed) {
+              if (parsed[id]?.status === deleteTargetStatus) {
+                parsed[id].status = reassignStatus;
+                changed = true;
+              }
+            }
+            if (changed) {
+              localStorage.setItem(guestKey, JSON.stringify(parsed));
+            }
+          }
+        } catch {}
+
+        // 2. Migrate in Supabase
+        if (user) {
+          try {
+            await supabase
+              .from("applications")
+              .update({ status: reassignStatus })
+              .eq("status", deleteTargetStatus)
+              .eq("user_id", user.id);
+          } catch (err) {
+            console.error("Failed to reassign applications in database:", err);
+          }
+        }
+
+        // 3. Dispatch event so active pages update immediately
+        try {
+          window.dispatchEvent(
+            new CustomEvent("jobtrace_status_renamed", {
+              detail: { oldStatus: deleteTargetStatus, newStatus: reassignStatus },
+            })
+          );
+        } catch {}
+      }
+
+      removeStatus(deleteTargetStatus);
+      setDeleteTargetStatus(null);
+      setDeleteStatusJobCount(0);
+    } finally {
+      setIsDeletingWithSafeguard(false);
+    }
   };
 
   const handleAddCustomField = (e: React.FormEvent) => {
@@ -866,7 +977,7 @@ export default function SettingsPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => removeStatus(statusName)}
+                                  onClick={() => handleInitiateDeleteStatus(statusName)}
                                   className="text-xs text-[#8b949e] hover:text-[#f85149] px-2 py-1 rounded transition-colors cursor-pointer"
                                 >
                                   Delete
@@ -930,6 +1041,104 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
+
+      {/* Deletion Safeguard Modal for Statuses */}
+      {deleteTargetStatus && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-100"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeletingWithSafeguard) {
+              setDeleteTargetStatus(null);
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl p-5 flex flex-col gap-4 text-xs animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div
+                className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                  deleteStatusJobCount > 0
+                    ? "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                    : "bg-red-500/10 border border-red-500/20 text-red-400"
+                }`}
+              >
+                {deleteStatusJobCount > 0 ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-[#f0f6fc] leading-snug">
+                  Delete &ldquo;{deleteTargetStatus}&rdquo; status?
+                </h3>
+                {deleteStatusJobCount > 0 ? (
+                  <p className="mt-1 text-xs text-[#8b949e] leading-relaxed">
+                    You currently have{" "}
+                    <span className="font-semibold text-amber-300 font-mono">
+                      {deleteStatusJobCount} {deleteStatusJobCount === 1 ? "application" : "applications"}
+                    </span>{" "}
+                    using this status. Choose which status to reassign them to so your records remain intact.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-[#8b949e] leading-relaxed">
+                    No applications currently use this status. Are you sure you want to remove it?
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {deleteStatusJobCount > 0 && (
+              <div className="p-3 bg-[#0d1117] border border-[#30363d] rounded-lg space-y-2">
+                <label className="block text-[11px] font-medium text-[#c9d1d9]">
+                  Reassign existing applications to:
+                </label>
+                <select
+                  value={reassignStatus}
+                  onChange={(e) => setReassignStatus(e.target.value)}
+                  className="w-full bg-[#161b22] border border-[#30363d] text-xs text-[#f0f6fc] rounded-md px-3 py-2 outline-none focus:border-[#58a6ff] cursor-pointer"
+                >
+                  {statuses
+                    .filter((s) => s !== deleteTargetStatus)
+                    .map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#30363d]/60">
+              <button
+                type="button"
+                disabled={isDeletingWithSafeguard}
+                onClick={() => setDeleteTargetStatus(null)}
+                className="px-3.5 py-1.5 rounded-lg border border-[#30363d] bg-transparent text-[#c9d1d9] hover:bg-[#21262d] font-medium transition-colors cursor-pointer text-xs disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingWithSafeguard || (deleteStatusJobCount > 0 && !reassignStatus)}
+                onClick={handleConfirmDeleteStatus}
+                className="px-4 py-1.5 rounded-lg text-white font-medium transition-colors cursor-pointer text-xs bg-[#da3633] hover:bg-[#b62324] disabled:opacity-50"
+              >
+                {isDeletingWithSafeguard
+                  ? "Reassigning & Deleting..."
+                  : deleteStatusJobCount > 0
+                  ? `Reassign & Delete`
+                  : "Delete Status"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
