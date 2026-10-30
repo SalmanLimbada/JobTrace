@@ -453,6 +453,20 @@ export default function JobTable({
     }
   }, [filterStatus, topStatuses, overflowStatuses]);
 
+  // Memoized search index per job (precomputed once when jobs change, zero regex overhead per keystroke)
+  const searchIndexMap = useMemo(() => {
+    const map = new Map<string, { full: string; clean: string }>();
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i];
+      const effId = getEffectiveJobId(job) || "";
+      const customVals = job.customFields ? Object.values(job.customFields).join(" ") : "";
+      const full = `${job.company} ${job.role} ${job.notes || ""} ${job.salary || ""} ${job.location || ""} ${job.deadlineDate || ""} ${job.url || ""} ${job.jobId || ""} ${effId} ${customVals}`.toLowerCase();
+      const clean = full.replace(/[^a-z0-9]/g, "");
+      map.set(job.id, { full, clean });
+    }
+    return map;
+  }, [jobs]);
+
   // Filtered jobs: match status AND search across company, role, notes, salary, location, deadline, url, jobId, and custom fields!
   const filteredJobs = useMemo(() => {
     const query = deferredQuery.toLowerCase().trim();
@@ -467,52 +481,15 @@ export default function JobTable({
       const matchesStatus = filterStatus === "All" || job.status === filterStatus;
       if (!matchesStatus) return false;
 
-      // 1. Core text fields
-      if (job.company.toLowerCase().includes(query)) return true;
-      if (job.role.toLowerCase().includes(query)) return true;
-      if (job.notes && job.notes.toLowerCase().includes(query)) return true;
-      if (job.salary && job.salary.toLowerCase().includes(query)) return true;
-      if (job.location && job.location.toLowerCase().includes(query)) return true;
-      if (job.deadlineDate && job.deadlineDate.toLowerCase().includes(query)) return true;
+      const indexed = searchIndexMap.get(job.id);
+      if (!indexed) return false;
 
-      // 2. URL search (matches full URL, domain, path, parameters, and embedded IDs)
-      if (job.url) {
-        const lowerUrl = job.url.toLowerCase();
-        if (lowerUrl.includes(query)) return true;
-        if (cleanQuery.length >= 3 && lowerUrl.replace(/[^a-z0-9]/g, "").includes(cleanQuery)) {
-          return true;
-        }
-      }
-
-      // 3. Direct Job ID property
-      if (job.jobId) {
-        const lowerJobId = job.jobId.toLowerCase();
-        if (lowerJobId.includes(query)) return true;
-        if (cleanQuery.length >= 3 && lowerJobId.replace(/[^a-z0-9]/g, "").includes(cleanQuery)) {
-          return true;
-        }
-      }
-
-      // 4. Effective Job ID extracted from URL or customFields (e.g. JR111568, 101029)
-      const effId = getEffectiveJobId(job);
-      if (effId) {
-        const lowerEffId = effId.toLowerCase();
-        if (lowerEffId.includes(query)) return true;
-        if (cleanQuery.length >= 3 && lowerEffId.replace(/[^a-z0-9]/g, "").includes(cleanQuery)) {
-          return true;
-        }
-      }
-
-      // 5. Custom fields
-      if (job.customFields) {
-        for (const val of Object.values(job.customFields)) {
-          if (val && val.toLowerCase().includes(query)) return true;
-        }
-      }
+      if (indexed.full.includes(query)) return true;
+      if (cleanQuery.length >= 3 && indexed.clean.includes(cleanQuery)) return true;
 
       return false;
     });
-  }, [jobs, filterStatus, deferredQuery]);
+  }, [jobs, filterStatus, deferredQuery, searchIndexMap]);
 
   // Sorted jobs (defaulting to appliedDate ascending; tie-break preserves insertion order)
   const sortedJobs = useMemo(() => {
@@ -969,6 +946,12 @@ export default function JobTable({
               placeholder="Search company, role, job ID (e.g. JR111568), or URL..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && searchQuery) {
+                  e.preventDefault();
+                  setSearchQuery("");
+                }
+              }}
               className="w-full bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 text-sm rounded px-3 pr-9 py-2 outline-none focus:border-zinc-400"
             />
             {searchQuery && (

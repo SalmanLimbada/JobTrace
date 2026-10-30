@@ -19,12 +19,28 @@ const GUEST_STORAGE_KEY = "job_tracker_guest_jobs";
 export default function Home() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { timeframe, setTimeframe } = useSettings();
-  const [jobs, setJobs] = useState<Record<string, JobApplication>>({});
+  const [jobs, setJobs] = useState<Record<string, JobApplication>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const guest = localStorage.getItem(GUEST_STORAGE_KEY);
+      if (guest) return JSON.parse(guest);
+    } catch {}
+    return {};
+  });
   const [editingJob, setEditingJob] = useState<JobApplication | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      // If we already have stored jobs locally, don't show a blocking full-page spinner
+      const guest = localStorage.getItem(GUEST_STORAGE_KEY);
+      if (guest && Object.keys(JSON.parse(guest)).length > 0) return false;
+    } catch {}
+    return true;
+  });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const hasLoadedRef = useRef(false);
   const prevUserIdRef = useRef<string | undefined>(undefined);
+  const lastFetchedRef = useRef(0);
 
   // Helper to persist to localStorage in guest mode
   const saveGuestJobs = (updated: Record<string, JobApplication>) => {
@@ -209,6 +225,7 @@ export default function Home() {
       console.error("Failed to connect to database:", err);
     } finally {
       hasLoadedRef.current = true;
+      lastFetchedRef.current = Date.now();
       setIsLoading(false);
     }
   }, [user?.id]);
@@ -295,11 +312,14 @@ export default function Home() {
     return () => window.removeEventListener("jobtrace_application_added", handleAppAdded);
   }, [fetchApplications, user?.id]);
 
-  // Auto-refresh when tab gains focus or becomes visible
+  // Auto-refresh when tab gains focus or becomes visible (throttled to avoid redundant queries on fast tab switches)
   useEffect(() => {
     function handleVisibility() {
       if (document.visibilityState === "visible") {
-        fetchApplications();
+        const now = Date.now();
+        if (now - lastFetchedRef.current >= 60000) {
+          fetchApplications();
+        }
       }
     }
     document.addEventListener("visibilitychange", handleVisibility);
@@ -435,6 +455,7 @@ export default function Home() {
   }
 
   async function handleStatusChange(id: string, newStatus: ApplicationStatus) {
+    const prevStatus = jobs[id]?.status;
     const nextJobs = {
       ...jobs,
       [id]: {
@@ -457,9 +478,21 @@ export default function Home() {
 
       if (error) {
         console.error("Error updating status in database:", error.message);
+        if (prevStatus) {
+          setJobs((prev) => ({
+            ...prev,
+            [id]: { ...prev[id], status: prevStatus },
+          }));
+        }
       }
     } catch (err) {
       console.error("Failed to update status in database:", err);
+      if (prevStatus) {
+        setJobs((prev) => ({
+          ...prev,
+          [id]: { ...prev[id], status: prevStatus },
+        }));
+      }
     }
   }
 
