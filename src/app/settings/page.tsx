@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import ClearableInput from "@/components/ClearableInput";
 import { useAuth } from "@/context/AuthContext";
 import {
   useSettings,
@@ -33,10 +34,12 @@ export default function SettingsPage() {
     toggleStandardColumn,
     customFields,
     addCustomField,
+    editCustomField,
     removeCustomField,
     toggleCustomField,
     statuses,
     addStatus,
+    editStatus,
     removeStatus,
     reorderStatuses,
     shortcuts,
@@ -60,6 +63,95 @@ export default function SettingsPage() {
   const [newFieldType, setNewFieldType] = useState<CustomFieldType>("text");
   const [newStatusName, setNewStatusName] = useState("");
   const [statusError, setStatusError] = useState("");
+
+  // Editing state for statuses
+  const [editingStatus, setEditingStatus] = useState<string | null>(null);
+  const [editStatusValue, setEditStatusValue] = useState("");
+  const [editStatusError, setEditStatusError] = useState("");
+
+  // Editing state for custom fields
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [editFieldName, setEditFieldName] = useState("");
+  const [editFieldError, setEditFieldError] = useState("");
+
+  const handleStartEditStatus = (name: string) => {
+    setEditingStatus(name);
+    setEditStatusValue(name);
+    setEditStatusError("");
+  };
+
+  const handleSaveEditStatus = (oldName: string) => {
+    const trimmed = editStatusValue.trim();
+    if (!trimmed) {
+      setEditStatusError("Status name cannot be empty");
+      return;
+    }
+    if (trimmed === oldName) {
+      setEditingStatus(null);
+      setEditStatusError("");
+      return;
+    }
+    const exists = statuses.some(
+      (s) => s.toLowerCase() !== oldName.toLowerCase() && s.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) {
+      setEditStatusError("This status already exists");
+      return;
+    }
+    const success = editStatus(oldName, trimmed);
+    if (!success) {
+      setEditStatusError("Could not update status");
+      return;
+    }
+    setEditingStatus(null);
+    setEditStatusError("");
+  };
+
+  const handleCancelEditStatus = () => {
+    setEditingStatus(null);
+    setEditStatusValue("");
+    setEditStatusError("");
+  };
+
+  const handleStartEditField = (field: { id: string; name: string }) => {
+    setEditingFieldId(field.id);
+    setEditFieldName(field.name);
+    setEditFieldError("");
+  };
+
+  const handleSaveEditField = (id: string) => {
+    const trimmed = editFieldName.trim();
+    if (!trimmed) {
+      setEditFieldError("Field name cannot be empty");
+      return;
+    }
+    const current = customFields.find((f) => f.id === id);
+    if (current && trimmed === current.name) {
+      setEditingFieldId(null);
+      setEditFieldError("");
+      return;
+    }
+    const exists = customFields.some(
+      (f) => f.id !== id && f.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) {
+      setEditFieldError("A field with this name already exists");
+      return;
+    }
+    const success = editCustomField(id, trimmed);
+    if (!success) {
+      setEditFieldError("Could not update field name");
+      return;
+    }
+    setEditingFieldId(null);
+    setEditFieldError("");
+  };
+
+  const handleCancelEditField = () => {
+    setEditingFieldId(null);
+    setEditFieldName("");
+    setEditFieldError("");
+  };
 
   const handleAddCustomField = (e: React.FormEvent) => {
     e.preventDefault();
@@ -486,12 +578,13 @@ export default function SettingsPage() {
                     onSubmit={handleAddCustomField}
                     className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center"
                   >
-                    <input
+                    <ClearableInput
                       type="text"
                       placeholder="Field name (e.g. Recruiter Contact)"
                       value={newFieldName}
                       onChange={(e) => setNewFieldName(e.target.value)}
-                      className="flex-1 bg-[#0d1117] border border-[#30363d] text-xs text-[#f0f6fc] placeholder-[#8b949e] rounded-md px-3 py-2 outline-none focus:border-[#58a6ff]"
+                      className="w-full bg-[#0d1117] border border-[#30363d] text-xs text-[#f0f6fc] placeholder-[#8b949e] rounded-md px-3 py-2 outline-none focus:border-[#58a6ff]"
+                      containerClassName="flex-1"
                     />
                     <select
                       value={newFieldType}
@@ -513,33 +606,93 @@ export default function SettingsPage() {
 
                   {/* List of Custom Fields */}
                   <div className="space-y-1.5 pt-2">
-                    {customFields.map((field) => (
-                      <div
-                        key={field.id}
-                        className="flex items-center justify-between p-2.5 rounded-md border border-[#30363d] bg-[#0d1117]"
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={field.enabled}
-                            onChange={() => toggleCustomField(field.id)}
-                            className="w-4 h-4 accent-[#58a6ff] cursor-pointer"
-                          />
-                          <span className="text-xs font-medium text-[#f0f6fc]">{field.name}</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#161b22] text-[#8b949e] border border-[#30363d] uppercase">
-                            {field.type}
-                          </span>
-                        </div>
+                    {customFields.map((field) => {
+                      const isEditing = editingFieldId === field.id;
 
-                        <button
-                          type="button"
-                          onClick={() => removeCustomField(field.id)}
-                          className="text-xs text-[#8b949e] hover:text-[#f85149] px-2 py-1 rounded transition-colors cursor-pointer"
+                      return (
+                        <div
+                          key={field.id}
+                          className="flex items-center justify-between p-2.5 rounded-md border border-[#30363d] bg-[#0d1117] gap-3"
                         >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
+                          {isEditing ? (
+                            <div className="flex-1 flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <ClearableInput
+                                  type="text"
+                                  value={editFieldName}
+                                  onChange={(e) => {
+                                    setEditFieldName(e.target.value);
+                                    if (editFieldError) setEditFieldError("");
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      handleSaveEditField(field.id);
+                                    } else if (e.key === "Escape") {
+                                      handleCancelEditField();
+                                    }
+                                  }}
+                                  placeholder="Field name"
+                                  autoFocus
+                                  className="w-full bg-[#161b22] border border-[#58a6ff] text-xs text-[#f0f6fc] rounded px-2.5 py-1 outline-none"
+                                  containerClassName="flex-1 max-w-sm"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEditField(field.id)}
+                                  className="px-2.5 py-1 text-xs font-medium bg-[#238636] hover:bg-[#2ea043] text-white rounded transition-colors cursor-pointer shrink-0"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEditField}
+                                  className="px-2.5 py-1 text-xs text-[#8b949e] hover:text-[#c9d1d9] rounded transition-colors cursor-pointer shrink-0"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              {editFieldError && (
+                                <p className="text-[11px] text-[#f85149]">{editFieldError}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={field.enabled}
+                                  onChange={() => toggleCustomField(field.id)}
+                                  className="w-4 h-4 accent-[#58a6ff] cursor-pointer"
+                                />
+                                <span className="text-xs font-medium text-[#f0f6fc]">{field.name}</span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#161b22] text-[#8b949e] border border-[#30363d] uppercase">
+                                  {field.type}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditField(field)}
+                                  className="text-xs text-[#8b949e] hover:text-[#58a6ff] px-2 py-1 rounded transition-colors cursor-pointer"
+                                  title="Rename field"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeCustomField(field.id)}
+                                  className="text-xs text-[#8b949e] hover:text-[#f85149] px-2 py-1 rounded transition-colors cursor-pointer"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -558,7 +711,7 @@ export default function SettingsPage() {
                 <div className="p-5 space-y-4">
                   {/* Add Status Form */}
                   <form onSubmit={handleAddStatus} className="flex gap-2">
-                    <input
+                    <ClearableInput
                       type="text"
                       placeholder="Status name (e.g. Assessment, Phone Screen)..."
                       value={newStatusName}
@@ -566,7 +719,8 @@ export default function SettingsPage() {
                         setNewStatusName(e.target.value);
                         if (statusError) setStatusError("");
                       }}
-                      className="flex-1 bg-[#0d1117] border border-[#30363d] text-xs text-[#f0f6fc] placeholder-[#8b949e] rounded-md px-3 py-2 outline-none focus:border-[#58a6ff]"
+                      className="w-full bg-[#0d1117] border border-[#30363d] text-xs text-[#f0f6fc] placeholder-[#8b949e] rounded-md px-3 py-2 outline-none focus:border-[#58a6ff]"
+                      containerClassName="flex-1"
                     />
                     <button
                       type="submit"
@@ -582,19 +736,22 @@ export default function SettingsPage() {
                   {/* List of Statuses with 6-dots Drag Handle */}
                   <div className="space-y-1.5 pt-1">
                     {statuses.map((statusName, idx) => {
+                      const isEditing = editingStatus === statusName;
                       const isDragged = draggedStatus === statusName;
                       const isOver = dragOverStatus === statusName && !isDragged;
 
                       return (
                         <div
                           key={statusName}
-                          draggable={true}
+                          draggable={!isEditing}
                           onDragStart={(e) => {
+                            if (isEditing) return;
                             setDraggedStatus(statusName);
                             e.dataTransfer.effectAllowed = "move";
                             e.dataTransfer.setData("text/plain", statusName);
                           }}
                           onDragOver={(e) => {
+                            if (isEditing) return;
                             e.preventDefault();
                             e.dataTransfer.dropEffect = "move";
                             if (draggedStatus && draggedStatus !== statusName) {
@@ -611,6 +768,7 @@ export default function SettingsPage() {
                             }
                           }}
                           onDrop={(e) => {
+                            if (isEditing) return;
                             e.preventDefault();
                             const source = draggedStatus || e.dataTransfer.getData("text/plain");
                             if (source && source !== statusName) {
@@ -623,7 +781,7 @@ export default function SettingsPage() {
                             setDraggedStatus(null);
                             setDragOverStatus(null);
                           }}
-                          className={`flex items-center justify-between p-2.5 rounded-md border bg-[#0d1117] transition-all duration-150 relative ${
+                          className={`flex items-center justify-between p-2.5 rounded-md border bg-[#0d1117] transition-all duration-150 relative gap-3 ${
                             isDragged
                               ? "opacity-30 border-dashed border-[#58a6ff]"
                               : isOver && dragOverSide === "above"
@@ -633,32 +791,89 @@ export default function SettingsPage() {
                               : "border-[#30363d]"
                           }`}
                         >
-                          <div className="flex items-center gap-2">
-                            {/* 6-dots drag handle */}
-                            <div
-                              className="text-[#8b949e] hover:text-[#c9d1d9] cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-[#21262d] transition-colors"
-                              title="Drag to reorder"
-                            >
-                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                                <circle cx="9" cy="6" r="1.5" />
-                                <circle cx="15" cy="6" r="1.5" />
-                                <circle cx="9" cy="12" r="1.5" />
-                                <circle cx="15" cy="12" r="1.5" />
-                                <circle cx="9" cy="18" r="1.5" />
-                                <circle cx="15" cy="18" r="1.5" />
-                              </svg>
+                          {isEditing ? (
+                            <div className="flex-1 flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono text-[#8b949e] w-4">{idx + 1}</span>
+                                <ClearableInput
+                                  type="text"
+                                  value={editStatusValue}
+                                  onChange={(e) => {
+                                    setEditStatusValue(e.target.value);
+                                    if (editStatusError) setEditStatusError("");
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      handleSaveEditStatus(statusName);
+                                    } else if (e.key === "Escape") {
+                                      handleCancelEditStatus();
+                                    }
+                                  }}
+                                  placeholder="Status name"
+                                  autoFocus
+                                  className="w-full bg-[#161b22] border border-[#58a6ff] text-xs text-[#f0f6fc] rounded px-2.5 py-1 outline-none"
+                                  containerClassName="flex-1 max-w-sm"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEditStatus(statusName)}
+                                  className="px-2.5 py-1 text-xs font-medium bg-[#238636] hover:bg-[#2ea043] text-white rounded transition-colors cursor-pointer shrink-0"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEditStatus}
+                                  className="px-2.5 py-1 text-xs text-[#8b949e] hover:text-[#c9d1d9] rounded transition-colors cursor-pointer shrink-0"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              {editStatusError && (
+                                <p className="text-[11px] text-[#f85149] ml-6">{editStatusError}</p>
+                              )}
                             </div>
-                            <span className="text-xs font-mono text-[#8b949e] w-4">{idx + 1}</span>
-                            <span className="text-xs font-medium text-[#f0f6fc]">{statusName}</span>
-                          </div>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-2">
+                                {/* 6-dots drag handle */}
+                                <div
+                                  className="text-[#8b949e] hover:text-[#c9d1d9] cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-[#21262d] transition-colors"
+                                  title="Drag to reorder"
+                                >
+                                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="9" cy="6" r="1.5" />
+                                    <circle cx="15" cy="6" r="1.5" />
+                                    <circle cx="9" cy="12" r="1.5" />
+                                    <circle cx="15" cy="12" r="1.5" />
+                                    <circle cx="9" cy="18" r="1.5" />
+                                    <circle cx="15" cy="18" r="1.5" />
+                                  </svg>
+                                </div>
+                                <span className="text-xs font-mono text-[#8b949e] w-4">{idx + 1}</span>
+                                <span className="text-xs font-medium text-[#f0f6fc]">{statusName}</span>
+                              </div>
 
-                          <button
-                            type="button"
-                            onClick={() => removeStatus(statusName)}
-                            className="text-xs text-[#8b949e] hover:text-[#f85149] px-2 py-1 rounded transition-colors cursor-pointer"
-                          >
-                            Delete
-                          </button>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditStatus(statusName)}
+                                  className="text-xs text-[#8b949e] hover:text-[#58a6ff] px-2 py-1 rounded transition-colors cursor-pointer"
+                                  title="Rename status"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeStatus(statusName)}
+                                  className="text-xs text-[#8b949e] hover:text-[#f85149] px-2 py-1 rounded transition-colors cursor-pointer"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
                     })}

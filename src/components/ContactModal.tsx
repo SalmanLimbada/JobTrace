@@ -2,6 +2,7 @@
 
 import { useState, useEffect, FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
+import ClearableInput from "@/components/ClearableInput";
 
 const SUPPORT_EMAIL = "support@jobtrace.app";
 
@@ -196,12 +197,13 @@ export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
                 <label className="block text-xs font-medium text-[#c9d1d9] mb-1">
                   Your Email <span className="text-[#8b949e] font-normal">(optional)</span>
                 </label>
-                <input
+                <ClearableInput
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your.email@domain.com (optional)"
                   className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors"
+                  containerClassName="w-full"
                 />
               </div>
 

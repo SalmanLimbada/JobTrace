@@ -5,6 +5,7 @@ import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { useSettings } from "@/context/SettingsContext";
 import DatePicker from "@/components/DatePicker";
 import ConfirmModal from "@/components/ConfirmModal";
+import ClearableInput from "@/components/ClearableInput";
 import { getEffectiveJobId, formatDateDisplay, findDuplicateJob, formatDuplicateMessage } from "@/lib/jobId";
 import { getStatusOptionClass } from "@/components/JobTable";
 
@@ -174,12 +175,13 @@ export default function EditJobModal({
               <label className="block text-[#8b949e] text-[11px] font-medium mb-1.5">
                 Company Name <span className="text-red-400">*</span>
               </label>
-              <input
+              <ClearableInput
                 type="text"
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 placeholder="Company (e.g. Amazon)"
                 className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors"
+                containerClassName="w-full"
                 required
               />
             </div>
@@ -187,12 +189,13 @@ export default function EditJobModal({
               <label className="block text-[#8b949e] text-[11px] font-medium mb-1.5">
                 Role / Title <span className="text-red-400">*</span>
               </label>
-              <input
+              <ClearableInput
                 type="text"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 placeholder="Role (e.g. Software Engineer)"
                 className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors"
+                containerClassName="w-full"
                 required
               />
             </div>
@@ -252,12 +255,13 @@ export default function EditJobModal({
                           className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors font-mono h-[34px]"
                         />
                       ) : (
-                        <input
+                        <ClearableInput
                           type={field.type === "number" ? "number" : "text"}
                           value={customValues[field.id] || ""}
                           onChange={(e) => handleCustomChange(field.id, e.target.value)}
                           placeholder={field.name}
                           className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors"
+                          containerClassName="w-full"
                         />
                       )}
                     </div>
@@ -273,12 +277,13 @@ export default function EditJobModal({
               Job Posting URL
             </label>
             <div className="flex gap-2">
-              <input
+              <ClearableInput
                 type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://..."
-                className="flex-1 bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors font-mono"
+                className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] placeholder-[#8b949e] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors font-mono"
+                containerClassName="flex-1"
               />
               {url.trim() && (
                 <a

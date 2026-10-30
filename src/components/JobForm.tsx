@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import type { ApplicationStatus, JobApplication } from "@/types/job";
 import { useSettings } from "@/context/SettingsContext";
 import DatePicker from "@/components/DatePicker";
+import ClearableInput from "@/components/ClearableInput";
 import { extractJobIdFromUrl, findDuplicateJob, formatDuplicateMessage, getLocalDateString } from "@/lib/jobId";
 import { getStatusOptionClass } from "@/components/JobTable";
 
@@ -136,26 +137,28 @@ export default function JobForm({ onAddJob, existingJobs, onOpenJob }: JobFormPr
     switch (colId) {
       case "company":
         return (
-          <input
+          <ClearableInput
             key="company"
             id="new-job-company-input"
             type="text"
             placeholder="Company *"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+            className="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+            containerClassName="w-full"
             required
           />
         );
       case "role":
         return (
-          <input
+          <ClearableInput
             key="role"
             type="text"
             placeholder="Role *"
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+            className="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+            containerClassName="w-full"
             required
           />
         );
@@ -187,25 +190,27 @@ export default function JobForm({ onAddJob, existingJobs, onOpenJob }: JobFormPr
         );
       case "url":
         return (
-          <input
+          <ClearableInput
             key="url"
             type="text"
             placeholder="Posting URL"
             value={url}
             onChange={(e) => handleUrlChange(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors font-mono"
+            className="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors font-mono"
+            containerClassName="w-full"
           />
         );
       case "notes":
         if (!activeCustomMap.has("notes")) return null;
         return (
-          <input
+          <ClearableInput
             key="notes"
             type="text"
             placeholder="Notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+            className="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+            containerClassName="w-full"
           />
         );
       default: {
@@ -226,13 +231,14 @@ export default function JobForm({ onAddJob, existingJobs, onOpenJob }: JobFormPr
           );
         }
         return (
-          <input
+          <ClearableInput
             key={colId}
             type={customField.type === "number" ? "number" : "text"}
             placeholder={customField.name}
             value={fieldValues[colId] || ""}
             onChange={(e) => handleFieldValueChange(colId, e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+            className="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+            containerClassName="w-full"
           />
         );
       }

@@ -310,6 +310,28 @@ export default function Home() {
     };
   }, [fetchApplications]);
 
+  // Listen for renamed statuses from Settings
+  useEffect(() => {
+    function handleStatusRenamed(e: Event) {
+      const detail = (e as CustomEvent<{ oldStatus: string; newStatus: string }>).detail;
+      if (!detail?.oldStatus || !detail?.newStatus) return;
+      setJobs((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const id in next) {
+          if (next[id]?.status === detail.oldStatus) {
+            next[id] = { ...next[id], status: detail.newStatus as ApplicationStatus };
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+
+    window.addEventListener("jobtrace_status_renamed", handleStatusRenamed);
+    return () => window.removeEventListener("jobtrace_status_renamed", handleStatusRenamed);
+  }, []);
+
   const jobList = Object.values(jobs);
   const totalMasterCount = jobList.length;
 

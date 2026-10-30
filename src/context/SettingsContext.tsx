@@ -131,10 +131,12 @@ interface SettingsContextType {
   setFilterStyle: (style: FilterStyle) => void;
   customFields: CustomFieldDefinition[];
   addCustomField: (name: string, type?: CustomFieldType) => void;
+  editCustomField: (id: string, newName: string) => boolean;
   removeCustomField: (id: string) => void;
   toggleCustomField: (id: string) => void;
   statuses: string[];
   addStatus: (name: string) => void;
+  editStatus: (oldName: string, newName: string) => boolean;
   removeStatus: (name: string) => void;
   moveStatus: (name: string, direction: "up" | "down") => void;
   reorderStatuses: (sourceName: string, targetName: string, side?: "above" | "below") => void;
@@ -538,6 +540,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     saveFields([...customFields, newField]);
   };
 
+  const editCustomField = (id: string, newName: string): boolean => {
+    const trimmed = newName.trim();
+    if (!trimmed) return false;
+    const exists = customFields.some(
+      (f) => f.id !== id && f.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) return false;
+    const updated = customFields.map((f) => (f.id === id ? { ...f, name: trimmed } : f));
+    saveFields(updated);
+    return true;
+  };
+
   const removeCustomField = (id: string) => {
     saveFields(customFields.filter((f) => f.id !== id));
     setColumnOrderState(columnOrder.filter((c) => c !== id));
@@ -621,6 +635,75 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(next));
     } catch {}
     scheduleCloudSync({ statuses: next });
+  };
+
+  const editStatus = (oldName: string, newName: string): boolean => {
+    const trimmed = newName.trim();
+    if (!trimmed) return false;
+    if (trimmed === oldName) return true;
+    const exists = statuses.some(
+      (s) => s.toLowerCase() !== oldName.toLowerCase() && s.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) return false;
+
+    const next = statuses.map((s) => (s === oldName ? trimmed : s));
+    setStatusesState(next);
+    try {
+      localStorage.setItem(STORAGE_STATUSES_KEY, JSON.stringify(next));
+    } catch {}
+    scheduleCloudSync({ statuses: next });
+
+    // Migrate existing applications in guest localStorage if present
+    try {
+      const guestKey = "job_tracker_guest_jobs";
+      const guestData = localStorage.getItem(guestKey);
+      if (guestData) {
+        const parsed = JSON.parse(guestData);
+        let hasChanges = false;
+        for (const id in parsed) {
+          if (parsed[id]?.status === oldName) {
+            parsed[id].status = trimmed;
+            hasChanges = true;
+          }
+        }
+        if (hasChanges) {
+          localStorage.setItem(guestKey, JSON.stringify(parsed));
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to migrate guest applications for renamed status:", e);
+    }
+
+    // Migrate existing applications in Supabase if authenticated
+    if (user) {
+      Promise.resolve(
+        supabase
+          .from("applications")
+          .update({ status: trimmed })
+          .eq("status", oldName)
+          .eq("user_id", user.id)
+      )
+        .then(({ error }) => {
+          if (error) {
+            console.error("Failed to migrate renamed status in database:", error.message);
+          }
+        })
+        .catch((err: unknown) => {
+          console.error("Failed to migrate renamed status in database:", err);
+        });
+    }
+
+    // Dispatch events to notify other components/tabs
+    try {
+      window.dispatchEvent(new Event("jobtrace_settings_updated"));
+      window.dispatchEvent(
+        new CustomEvent("jobtrace_status_renamed", {
+          detail: { oldStatus: oldName, newStatus: trimmed },
+        })
+      );
+    } catch {}
+
+    return true;
   };
 
   const removeStatus = (name: string) => {
@@ -793,10 +876,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setFilterStyle,
         customFields,
         addCustomField,
+        editCustomField,
         removeCustomField,
         toggleCustomField,
         statuses,
         addStatus,
+        editStatus,
         removeStatus,
         moveStatus,
         reorderStatuses,
