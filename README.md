@@ -19,6 +19,7 @@ Live site: [https://job-trace-web.vercel.app/](https://job-trace-web.vercel.app/
 - Next.js
 - React
 - TypeScript
+- JavaScript
 - Tailwind CSS
 - Supabase (PostgreSQL)
 - Chrome Extension (Manifest V3)
