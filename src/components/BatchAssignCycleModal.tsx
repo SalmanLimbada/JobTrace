@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import type { JobApplication } from "@/types/job";
+import DatePicker from "@/components/DatePicker";
 
 interface BatchAssignCycleModalProps {
   isOpen: boolean;
@@ -236,20 +237,22 @@ export default function BatchAssignCycleModal({
             <div className="p-3 bg-[#0d1117] border border-[#30363d] rounded-lg grid grid-cols-2 gap-2 animate-in fade-in duration-100">
               <div>
                 <span className="block text-[10px] text-[#8b949e] mb-1">From Date</span>
-                <input
-                  type="date"
+                <DatePicker
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full bg-[#161b22] border border-[#30363d] text-[#f0f6fc] text-xs rounded px-2 py-1 outline-none focus:border-[#58a6ff]"
+                  onChange={setStartDate}
+                  placeholder="Select start date"
+                  align="left"
+                  className="w-full bg-[#161b22] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-[#58a6ff] cursor-pointer h-[32px]"
                 />
               </div>
               <div>
                 <span className="block text-[10px] text-[#8b949e] mb-1">To Date</span>
-                <input
-                  type="date"
+                <DatePicker
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-[#161b22] border border-[#30363d] text-[#f0f6fc] text-xs rounded px-2 py-1 outline-none focus:border-[#58a6ff]"
+                  onChange={setEndDate}
+                  placeholder="Select end date"
+                  align="right"
+                  className="w-full bg-[#161b22] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-[#58a6ff] cursor-pointer h-[32px]"
                 />
               </div>
             </div>
