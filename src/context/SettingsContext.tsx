@@ -23,6 +23,8 @@ export interface CloudSettingsPayload {
   statuses: string[];
   extensionSettings: ExtensionSettings;
   timeframe?: TimeframeFilter;
+  cycles?: string[];
+  activeCycle?: string;
   updatedAt?: string;
 }
 
@@ -152,6 +154,12 @@ interface SettingsContextType {
   updateExtensionSettings: (partial: Partial<ExtensionSettings>) => void;
   timeframe: TimeframeFilter;
   setTimeframe: (timeframe: TimeframeFilter) => void;
+  cycles: string[];
+  activeCycle: string;
+  setActiveCycle: (cycle: string) => void;
+  addCycle: (name: string) => boolean;
+  renameCycle: (oldName: string, newName: string) => boolean;
+  deleteCycle: (name: string, reassignTo?: string) => boolean;
   cloudSyncStatus: CloudSyncStatus;
   syncToCloud: () => Promise<void>;
   applySettings: (payload: {
@@ -176,6 +184,8 @@ const STORAGE_SHORTCUTS_KEY = "jobtrace_shortcuts";
 const STORAGE_STATUSES_KEY = "jobtrace_statuses_v1";
 const STORAGE_EXTENSION_SETTINGS_KEY = "jobtrace_extension_settings";
 const STORAGE_TIMEFRAME_KEY = "jobtrace_timeframe_filter";
+const STORAGE_CYCLES_KEY = "jobtrace_cycles_v1";
+const STORAGE_ACTIVE_CYCLE_KEY = "jobtrace_active_cycle_v1";
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -192,6 +202,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [statuses, setStatusesState] = useState<string[]>(DEFAULT_STATUSES);
   const [extensionSettings, setExtensionSettings] = useState<ExtensionSettings>(DEFAULT_EXTENSION_SETTINGS);
   const [timeframe, setTimeframeState] = useState<TimeframeFilter>({ preset: "all" });
+  const [cycles, setCyclesState] = useState<string[]>([]);
+  const [activeCycle, setActiveCycleState] = useState<string>("All");
 
   const latestSettingsRef = useRef<CloudSettingsPayload>({
     theme,
@@ -204,6 +216,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     statuses,
     extensionSettings,
     timeframe,
+    cycles,
+    activeCycle,
   });
 
   useEffect(() => {
@@ -218,8 +232,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       statuses,
       extensionSettings,
       timeframe,
+      cycles,
+      activeCycle,
     };
-  }, [theme, filterStyle, customFields, standardColumns, showRowNumbers, columnOrder, shortcuts, statuses, extensionSettings, timeframe]);
+  }, [theme, filterStyle, customFields, standardColumns, showRowNumbers, columnOrder, shortcuts, statuses, extensionSettings, timeframe, cycles, activeCycle]);
 
   const syncToCloud = useCallback(async (customSnapshot?: Partial<CloudSettingsPayload>) => {
     if (!user) {
@@ -309,6 +325,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setTimeframeState(cloudData.timeframe);
         try { localStorage.setItem(STORAGE_TIMEFRAME_KEY, JSON.stringify(cloudData.timeframe)); } catch {}
       }
+      if (Array.isArray(cloudData.cycles)) {
+        setCyclesState(cloudData.cycles);
+        try { localStorage.setItem(STORAGE_CYCLES_KEY, JSON.stringify(cloudData.cycles)); } catch {}
+      }
+      if (typeof cloudData.activeCycle === "string") {
+        setActiveCycleState(cloudData.activeCycle);
+        try { localStorage.setItem(STORAGE_ACTIVE_CYCLE_KEY, cloudData.activeCycle); } catch {}
+      }
       setCloudSyncStatus("synced");
       window.dispatchEvent(new Event("jobtrace_settings_updated"));
     } else {
@@ -333,6 +357,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             setTimeframeState(parsed);
           }
         } catch {}
+      }
+      // Cycles
+      const savedCycles = localStorage.getItem(STORAGE_CYCLES_KEY);
+      if (savedCycles) {
+        try {
+          const parsed = JSON.parse(savedCycles);
+          if (Array.isArray(parsed)) {
+            setCyclesState(parsed);
+          }
+        } catch {}
+      }
+      const savedActiveCycle = localStorage.getItem(STORAGE_ACTIVE_CYCLE_KEY);
+      if (savedActiveCycle) {
+        setActiveCycleState(savedActiveCycle);
       }
       // Extension Settings
       const savedExt = localStorage.getItem(STORAGE_EXTENSION_SETTINGS_KEY);
@@ -865,6 +903,130 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     scheduleCloudSync({ timeframe: tf });
   };
 
+  const setActiveCycle = (cycle: string) => {
+    setActiveCycleState(cycle);
+    try {
+      localStorage.setItem(STORAGE_ACTIVE_CYCLE_KEY, cycle);
+      window.dispatchEvent(new Event("jobtrace_settings_updated"));
+    } catch {}
+    scheduleCloudSync({ activeCycle: cycle });
+  };
+
+  const addCycle = (name: string): boolean => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    if (trimmed.toLowerCase() === "all") return false;
+    const exists = cycles.some((c) => c.toLowerCase() === trimmed.toLowerCase());
+    if (exists) return false;
+
+    const next = [...cycles, trimmed];
+    setCyclesState(next);
+    setActiveCycleState(trimmed);
+    try {
+      localStorage.setItem(STORAGE_CYCLES_KEY, JSON.stringify(next));
+      localStorage.setItem(STORAGE_ACTIVE_CYCLE_KEY, trimmed);
+      window.dispatchEvent(new Event("jobtrace_settings_updated"));
+    } catch {}
+    scheduleCloudSync({ cycles: next, activeCycle: trimmed });
+    return true;
+  };
+
+  const renameCycle = (oldName: string, newName: string): boolean => {
+    const trimmed = newName.trim();
+    if (!trimmed) return false;
+    if (trimmed.toLowerCase() === "all") return false;
+    if (trimmed === oldName) return true;
+    const exists = cycles.some((c) => c.toLowerCase() !== oldName.toLowerCase() && c.toLowerCase() === trimmed.toLowerCase());
+    if (exists) return false;
+
+    const next = cycles.map((c) => (c === oldName ? trimmed : c));
+    setCyclesState(next);
+
+    const nextActive = activeCycle === oldName ? trimmed : activeCycle;
+    setActiveCycleState(nextActive);
+
+    try {
+      localStorage.setItem(STORAGE_CYCLES_KEY, JSON.stringify(next));
+      localStorage.setItem(STORAGE_ACTIVE_CYCLE_KEY, nextActive);
+    } catch {}
+    scheduleCloudSync({ cycles: next, activeCycle: nextActive });
+
+    // Migrate applications in guest localStorage
+    try {
+      const guestKey = "job_tracker_guest_jobs";
+      const guestData = localStorage.getItem(guestKey);
+      if (guestData) {
+        const parsed = JSON.parse(guestData);
+        let changed = false;
+        for (const id in parsed) {
+          if (parsed[id]?.cycle === oldName) {
+            parsed[id].cycle = trimmed;
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem(guestKey, JSON.stringify(parsed));
+        }
+      }
+    } catch {}
+
+    // Notify listeners to update active jobs
+    try {
+      window.dispatchEvent(
+        new CustomEvent("jobtrace_cycle_renamed", {
+          detail: { oldCycle: oldName, newCycle: trimmed },
+        })
+      );
+      window.dispatchEvent(new Event("jobtrace_settings_updated"));
+    } catch {}
+
+    return true;
+  };
+
+  const deleteCycle = (name: string, reassignTo?: string): boolean => {
+    const next = cycles.filter((c) => c !== name);
+    setCyclesState(next);
+
+    const nextActive = activeCycle === name ? (next[0] || "All") : activeCycle;
+    setActiveCycleState(nextActive);
+
+    try {
+      localStorage.setItem(STORAGE_CYCLES_KEY, JSON.stringify(next));
+      localStorage.setItem(STORAGE_ACTIVE_CYCLE_KEY, nextActive);
+    } catch {}
+    scheduleCloudSync({ cycles: next, activeCycle: nextActive });
+
+    // Migrate applications in guest localStorage if reassigning
+    try {
+      const guestKey = "job_tracker_guest_jobs";
+      const guestData = localStorage.getItem(guestKey);
+      if (guestData) {
+        const parsed = JSON.parse(guestData);
+        let changed = false;
+        for (const id in parsed) {
+          if (parsed[id]?.cycle === name) {
+            parsed[id].cycle = reassignTo && reassignTo !== "All" ? reassignTo : undefined;
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem(guestKey, JSON.stringify(parsed));
+        }
+      }
+    } catch {}
+
+    try {
+      window.dispatchEvent(
+        new CustomEvent("jobtrace_cycle_deleted", {
+          detail: { deletedCycle: name, reassignTo: reassignTo || "" },
+        })
+      );
+      window.dispatchEvent(new Event("jobtrace_settings_updated"));
+    } catch {}
+
+    return true;
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -901,6 +1063,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         updateExtensionSettings,
         timeframe,
         setTimeframe,
+        cycles,
+        activeCycle,
+        setActiveCycle,
+        addCycle,
+        renameCycle,
+        deleteCycle,
         applySettings,
         cloudSyncStatus,
         syncToCloud,

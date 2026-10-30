@@ -33,5 +33,6 @@ export interface JobApplication {
   location?: string;
   deadlineDate?: string;
   jobId?: string;
+  cycle?: string;
   createdAt?: string;
 }
