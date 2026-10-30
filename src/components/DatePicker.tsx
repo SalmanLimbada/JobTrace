@@ -10,6 +10,7 @@ interface DatePickerProps {
   className?: string;
   id?: string;
   align?: "left" | "right";
+  dropUp?: boolean;
 }
 
 const MONTH_NAMES = [
@@ -54,9 +55,24 @@ export default function DatePicker({
   className = "",
   id,
   align = "left",
+  dropUp,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpwards, setOpenUpwards] = useState(dropUp ?? false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const toggleOpen = () => {
+    if (!isOpen && containerRef.current) {
+      if (dropUp !== undefined) {
+        setOpenUpwards(dropUp);
+      } else {
+        const rect = containerRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        setOpenUpwards(spaceBelow < 290 && rect.top > 250);
+      }
+    }
+    setIsOpen((prev) => !prev);
+  };
 
   const parsed = parseIso(value);
   const today = new Date();
@@ -139,7 +155,7 @@ export default function DatePicker({
         type="button"
         id={id}
         title={title}
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={toggleOpen}
         className={`w-full flex items-center justify-between text-left transition-colors cursor-pointer select-none ${className}`}
       >
         <span className={value ? "text-zinc-100 font-mono" : "text-zinc-500"}>
@@ -163,7 +179,9 @@ export default function DatePicker({
       {/* Sleek Custom Dark Calendar Popover */}
       {isOpen && (
         <div
-          className={`absolute ${align === "right" ? "right-0" : "left-0"} top-full mt-1.5 z-50 w-[260px] max-w-[calc(100vw-24px)] bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-100 font-sans select-none`}
+          className={`absolute ${align === "right" ? "right-0" : "left-0"} ${
+            openUpwards ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } z-50 w-[260px] max-w-[calc(100vw-24px)] bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-100 font-sans select-none`}
         >
           {/* Calendar Header: Month + Year + Navigation */}
           <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-[#30363d]/70">

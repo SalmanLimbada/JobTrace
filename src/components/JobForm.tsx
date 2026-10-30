@@ -62,27 +62,6 @@ export default function JobForm({ onAddJob, existingJobs, onOpenJob }: JobFormPr
 
   const targetJobId = fieldValues["jobId"]?.trim() || extractJobIdFromUrl(url);
 
-  // Distinct company and role suggestions for fast typeahead autocomplete
-  const existingCompanies = useMemo(() => {
-    if (!existingJobs || existingJobs.length === 0) return [];
-    const set = new Set<string>();
-    for (let i = 0; i < existingJobs.length; i++) {
-      const c = existingJobs[i].company?.trim();
-      if (c) set.add(c);
-    }
-    return Array.from(set).sort();
-  }, [existingJobs]);
-
-  const existingRoles = useMemo(() => {
-    if (!existingJobs || existingJobs.length === 0) return [];
-    const set = new Set<string>();
-    for (let i = 0; i < existingJobs.length; i++) {
-      const r = existingJobs[i].role?.trim();
-      if (r) set.add(r);
-    }
-    return Array.from(set).sort();
-  }, [existingJobs]);
-
   const duplicateJob = useMemo(() => {
     if (!existingJobs || existingJobs.length === 0) return null;
     if (!company.trim() && !role.trim() && !url.trim() && !targetJobId) return null;
@@ -169,7 +148,6 @@ export default function JobForm({ onAddJob, existingJobs, onOpenJob }: JobFormPr
             key="company"
             id="new-job-company-input"
             type="text"
-            list="jobform-companies-datalist"
             placeholder="Company *"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
@@ -183,7 +161,6 @@ export default function JobForm({ onAddJob, existingJobs, onOpenJob }: JobFormPr
           <ClearableInput
             key="role"
             type="text"
-            list="jobform-roles-datalist"
             placeholder="Role *"
             value={role}
             onChange={(e) => setRole(e.target.value)}
@@ -325,22 +302,6 @@ export default function JobForm({ onAddJob, existingJobs, onOpenJob }: JobFormPr
             <span>Add Job</span>
           </button>
         </div>
-
-        {/* Datalists for autocomplete */}
-        {existingCompanies.length > 0 && (
-          <datalist id="jobform-companies-datalist">
-            {existingCompanies.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
-        )}
-        {existingRoles.length > 0 && (
-          <datalist id="jobform-roles-datalist">
-            {existingRoles.map((r) => (
-              <option key={r} value={r} />
-            ))}
-          </datalist>
-        )}
       </form>
     </section>
   );

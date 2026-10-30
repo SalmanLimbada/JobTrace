@@ -88,12 +88,12 @@ export default function BatchAssignCycleModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-100"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-100 overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl p-5 flex flex-col gap-4 text-xs animate-in zoom-in-95 duration-150">
+      <div className="w-full max-w-md my-auto max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl p-5 flex flex-col gap-4 text-xs animate-in zoom-in-95 duration-150">
         <div>
           <h3 className="text-sm font-semibold text-[#f0f6fc]">Batch Assign to Recruiting Cycle</h3>
           <p className="mt-1 text-xs text-[#8b949e]">
@@ -242,6 +242,7 @@ export default function BatchAssignCycleModal({
                   onChange={setStartDate}
                   placeholder="Select start date"
                   align="left"
+                  dropUp={true}
                   className="w-full bg-[#161b22] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-[#58a6ff] cursor-pointer h-[32px]"
                 />
               </div>
@@ -252,6 +253,7 @@ export default function BatchAssignCycleModal({
                   onChange={setEndDate}
                   placeholder="Select end date"
                   align="right"
+                  dropUp={true}
                   className="w-full bg-[#161b22] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-[#58a6ff] cursor-pointer h-[32px]"
                 />
               </div>
