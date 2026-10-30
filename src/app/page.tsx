@@ -300,6 +300,7 @@ export default function Home() {
         salary: row.salary || undefined,
         location: row.location || undefined,
         deadlineDate: row.deadline_date || row.deadlineDate || undefined,
+        cycle: row.cycle || cleanedCustomFields?.cycle || undefined,
         jobId: extractedJobId,
         customFields: cleanedCustomFields,
         keyRequirements: parsedRequirements,
@@ -784,6 +785,81 @@ export default function Home() {
     }
   }
 
+  async function handleBatchAssignCycle(jobIds: string[], targetCycle: string) {
+    if (jobIds.length === 0) return;
+
+    if (targetCycle && !cycles.includes(targetCycle)) {
+      addCycle(targetCycle);
+    }
+
+    setJobs((prev) => {
+      const next = { ...prev };
+      for (const id of jobIds) {
+        if (next[id]) {
+          const updatedCustom = { ...(next[id].customFields || {}) };
+          if (targetCycle) {
+            updatedCustom.cycle = targetCycle;
+          } else {
+            delete updatedCustom.cycle;
+          }
+          next[id] = {
+            ...next[id],
+            cycle: targetCycle || undefined,
+            customFields: Object.keys(updatedCustom).length > 0 ? updatedCustom : undefined,
+          };
+        }
+      }
+      return next;
+    });
+
+    if (!user) {
+      const nextJobs = { ...jobs };
+      for (const id of jobIds) {
+        if (nextJobs[id]) {
+          const updatedCustom = { ...(nextJobs[id].customFields || {}) };
+          if (targetCycle) {
+            updatedCustom.cycle = targetCycle;
+          } else {
+            delete updatedCustom.cycle;
+          }
+          nextJobs[id] = {
+            ...nextJobs[id],
+            cycle: targetCycle || undefined,
+            customFields: Object.keys(updatedCustom).length > 0 ? updatedCustom : undefined,
+          };
+        }
+      }
+      saveGuestJobs(nextJobs);
+      return;
+    }
+
+    try {
+      const CHUNK_SIZE = 25;
+      for (let i = 0; i < jobIds.length; i += CHUNK_SIZE) {
+        const chunk = jobIds.slice(i, i + CHUNK_SIZE);
+        await Promise.all(
+          chunk.map(async (id) => {
+            const currentJob = jobs[id];
+            const mergedCustom: Record<string, unknown> = {
+              ...(currentJob?.customFields || {}),
+            };
+            if (targetCycle) {
+              mergedCustom.cycle = targetCycle;
+            } else {
+              delete mergedCustom.cycle;
+            }
+            return supabase
+              .from("applications")
+              .update({ custom_fields: mergedCustom })
+              .eq("id", id);
+          })
+        );
+      }
+    } catch (err) {
+      console.error("Failed to batch update cycle in database:", err);
+    }
+  }
+
   async function handleMigrateStatus(oldStatus: string, newStatus: string) {
     const nextJobs = { ...jobs };
     let hasChanges = false;
@@ -978,11 +1054,13 @@ export default function Home() {
         ) : (
           <JobTable
             jobs={filteredJobs}
+            allJobs={jobList}
             onStatusChange={handleStatusChange}
             onSaveEdit={handleSaveEdit}
             onDeleteJob={handleDeleteJob}
             onDeleteJobs={handleDeleteJobs}
             onImportJobs={handleImportJobs}
+            onBatchAssignCycle={handleBatchAssignCycle}
             editingJob={editingJob}
             onEditJob={setEditingJob}
           />

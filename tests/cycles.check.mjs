@@ -117,5 +117,42 @@ function createCycleManager(initialCycles = [], initialActive = "All") {
   assert.equal(mgr.getActiveCycle(), "All");
   assert.equal(mgr.getJobs().job1.cycle, undefined);
 
+  // Test 9: Deactivate cycle & Batch Assign
+  mgr.addCycle("Spring 2026");
+  mgr.setActiveCycle("Spring 2026");
+  assert.equal(mgr.getActiveCycle(), "Spring 2026");
+  // Deactivate:
+  mgr.setActiveCycle("All");
+  assert.equal(mgr.getActiveCycle(), "All");
+
+  // Batch assign jobs
+  const jobsToBatch = {
+    a: { id: "a", company: "Apple", appliedDate: "2026-02-01" },
+    b: { id: "b", company: "Netflix", appliedDate: "2026-02-15" },
+    c: { id: "c", company: "Stripe", appliedDate: "2025-05-10" },
+  };
+  mgr.setJobs(jobsToBatch);
+
+  // Batch assign [a, b] to "Spring 2026"
+  const batchAssign = (jobIds, targetCycle) => {
+    const cur = mgr.getJobs();
+    for (const id of jobIds) {
+      if (cur[id]) {
+        cur[id] = { ...cur[id], cycle: targetCycle || undefined };
+      }
+    }
+    mgr.setJobs(cur);
+  };
+
+  batchAssign(["a", "b"], "Spring 2026");
+  assert.equal(mgr.getJobs().a.cycle, "Spring 2026");
+  assert.equal(mgr.getJobs().b.cycle, "Spring 2026");
+  assert.equal(mgr.getJobs().c.cycle, undefined);
+
+  // Batch clear cycle
+  batchAssign(["a"], "");
+  assert.equal(mgr.getJobs().a.cycle, undefined);
+  assert.equal(mgr.getJobs().b.cycle, "Spring 2026");
+
   console.log("✓ All Cycles logic tests passed successfully!");
 }

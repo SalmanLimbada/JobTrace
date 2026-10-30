@@ -23,6 +23,7 @@ type SettingsSection =
   | "columns"
   | "fields"
   | "statuses"
+  | "cycles"
   | "shortcuts";
 
 export default function SettingsPage() {
@@ -49,6 +50,12 @@ export default function SettingsPage() {
     resetShortcuts,
     extensionSettings,
     updateExtensionSettings,
+    cycles,
+    activeCycle,
+    setActiveCycle,
+    addCycle,
+    renameCycle,
+    deleteCycle,
     cloudSyncStatus,
     syncToCloud,
   } = useSettings();
@@ -65,6 +72,124 @@ export default function SettingsPage() {
   const [newFieldType, setNewFieldType] = useState<CustomFieldType>("text");
   const [newStatusName, setNewStatusName] = useState("");
   const [statusError, setStatusError] = useState("");
+
+  // Local state for adding cycles
+  const [newCycleName, setNewCycleName] = useState("");
+  const [cycleError, setCycleError] = useState("");
+
+  // Editing state for cycles
+  const [editingCycle, setEditingCycle] = useState<string | null>(null);
+  const [editCycleValue, setEditCycleValue] = useState("");
+  const [editCycleError, setEditCycleError] = useState("");
+
+  // Deletion safeguard state for cycles
+  const [deleteTargetCycle, setDeleteTargetCycle] = useState<string | null>(null);
+  const [deleteCycleJobCount, setDeleteCycleJobCount] = useState<number>(0);
+  const [reassignCycle, setReassignCycle] = useState<string>("");
+  const [isDeletingCycle, setIsDeletingCycle] = useState<boolean>(false);
+
+  const getJobCountForCycle = async (cycleName: string): Promise<number> => {
+    let count = 0;
+    try {
+      const guestData = localStorage.getItem("job_tracker_guest_jobs");
+      if (guestData) {
+        const parsed = JSON.parse(guestData);
+        for (const id in parsed) {
+          if (parsed[id]?.cycle === cycleName) count++;
+        }
+      }
+    } catch {}
+
+    if (!user) return count;
+
+    try {
+      const cached = localStorage.getItem("jobtrace_cached_applications");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed.filter((j: any) => j.cycle === cycleName || j.customFields?.cycle === cycleName).length;
+      }
+    } catch {}
+
+    return count;
+  };
+
+  const handleAddCycle = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newCycleName.trim();
+    if (!trimmed) return;
+    if (trimmed.toLowerCase() === "all") {
+      setCycleError("'All' is reserved");
+      return;
+    }
+    if (cycles.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+      setCycleError("This cycle already exists");
+      return;
+    }
+    const success = addCycle(trimmed);
+    if (success) {
+      setNewCycleName("");
+      setCycleError("");
+    } else {
+      setCycleError("Could not add cycle");
+    }
+  };
+
+  const handleStartEditCycle = (name: string) => {
+    setEditingCycle(name);
+    setEditCycleValue(name);
+    setEditCycleError("");
+  };
+
+  const handleSaveEditCycle = (oldName: string) => {
+    const trimmed = editCycleValue.trim();
+    if (!trimmed) {
+      setEditCycleError("Cycle name cannot be empty");
+      return;
+    }
+    if (trimmed.toLowerCase() === "all") {
+      setEditCycleError("'All' is reserved");
+      return;
+    }
+    if (trimmed === oldName) {
+      setEditingCycle(null);
+      setEditCycleError("");
+      return;
+    }
+    const exists = cycles.some(
+      (c) => c.toLowerCase() !== oldName.toLowerCase() && c.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) {
+      setEditCycleError("This cycle already exists");
+      return;
+    }
+    const success = renameCycle(oldName, trimmed);
+    if (!success) {
+      setEditCycleError("Could not update cycle");
+      return;
+    }
+    setEditingCycle(null);
+    setEditCycleError("");
+  };
+
+  const handleInitiateDeleteCycle = async (cycleName: string) => {
+    const count = await getJobCountForCycle(cycleName);
+    setDeleteTargetCycle(cycleName);
+    setDeleteCycleJobCount(count);
+    const remaining = cycles.filter((c) => c !== cycleName);
+    setReassignCycle(remaining[0] || "");
+  };
+
+  const handleConfirmDeleteCycle = async () => {
+    if (!deleteTargetCycle) return;
+    setIsDeletingCycle(true);
+    try {
+      deleteCycle(deleteTargetCycle, reassignCycle || undefined);
+      setDeleteTargetCycle(null);
+      setDeleteCycleJobCount(0);
+    } finally {
+      setIsDeletingCycle(false);
+    }
+  };
 
   // Editing state for statuses
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
@@ -345,6 +470,11 @@ export default function SettingsPage() {
       id: "statuses",
       label: "Application Statuses",
       desc: "Application stages and order",
+    },
+    {
+      id: "cycles",
+      label: "Recruiting Cycles",
+      desc: "Season & cohort tracking",
     },
     {
       id: "shortcuts",
@@ -993,7 +1123,161 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* 6. SHORTCUTS SECTION */}
+            {/* 6. CYCLES SECTION */}
+            {activeSection === "cycles" && (
+              <div className="border border-[#30363d] bg-[#161b22] rounded-lg overflow-hidden">
+                <div className="px-5 py-4 border-b border-[#30363d]">
+                  <h2 className="text-sm font-semibold text-[#f0f6fc]">Recruiting Cycles</h2>
+                  <p className="text-xs text-[#8b949e] mt-0.5">
+                    Organize job applications into cohorts (e.g. &ldquo;Summer 2026&rdquo;, &ldquo;New Grad 2025&rdquo;). Setting an active cycle auto-tags newly added applications. You can deactivate it anytime to leave new applications untagged.
+                  </p>
+                </div>
+
+                <div className="p-5 space-y-4">
+                  {/* Add Cycle Form */}
+                  <form onSubmit={handleAddCycle} className="flex gap-2">
+                    <ClearableInput
+                      type="text"
+                      placeholder="Cycle name (e.g. Summer 2026, Full-Time 2025)..."
+                      value={newCycleName}
+                      onChange={(e) => {
+                        setNewCycleName(e.target.value);
+                        if (cycleError) setCycleError("");
+                      }}
+                      className="w-full bg-[#0d1117] border border-[#30363d] text-xs text-[#f0f6fc] placeholder-[#8b949e] rounded-md px-3 py-2 outline-none focus:border-[#58a6ff]"
+                      containerClassName="flex-1"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newCycleName.trim()}
+                      className="px-3.5 py-2 text-xs font-medium bg-[#238636] hover:bg-[#2ea043] disabled:opacity-40 text-white rounded-md transition-colors cursor-pointer shrink-0"
+                    >
+                      Add Cycle
+                    </button>
+                  </form>
+
+                  {cycleError && <p className="text-xs text-[#f85149]">{cycleError}</p>}
+
+                  {/* List of Cycles */}
+                  <div className="space-y-1.5 pt-1">
+                    {cycles.length === 0 ? (
+                      <div className="p-4 rounded-md border border-dashed border-[#30363d] text-center text-xs text-[#8b949e]">
+                        No custom cycles yet. Create your first recruiting season above!
+                      </div>
+                    ) : (
+                      cycles.map((cycleName) => {
+                        const isEditing = editingCycle === cycleName;
+                        const isActive = activeCycle === cycleName;
+
+                        return (
+                          <div
+                            key={cycleName}
+                            className={`flex items-center justify-between p-2.5 rounded-md border bg-[#0d1117] transition-all gap-3 ${
+                              isActive ? "border-[#58a6ff]/40 bg-[#161b22]" : "border-[#30363d]"
+                            }`}
+                          >
+                            {isEditing ? (
+                              <div className="flex-1 flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                  <ClearableInput
+                                    type="text"
+                                    value={editCycleValue}
+                                    onChange={(e) => {
+                                      setEditCycleValue(e.target.value);
+                                      if (editCycleError) setEditCycleError("");
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        handleSaveEditCycle(cycleName);
+                                      } else if (e.key === "Escape") {
+                                        setEditingCycle(null);
+                                      }
+                                    }}
+                                    placeholder="Cycle name"
+                                    autoFocus
+                                    className="w-full bg-[#161b22] border border-[#58a6ff] text-xs text-[#f0f6fc] rounded px-2.5 py-1 outline-none"
+                                    containerClassName="flex-1 max-w-sm"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveEditCycle(cycleName)}
+                                    className="px-2.5 py-1 text-xs font-medium bg-[#238636] hover:bg-[#2ea043] text-white rounded transition-colors cursor-pointer shrink-0"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingCycle(null)}
+                                    className="px-2.5 py-1 text-xs text-[#8b949e] hover:text-[#c9d1d9] rounded transition-colors cursor-pointer shrink-0"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                                {editCycleError && (
+                                  <p className="text-[11px] text-[#f85149]">{editCycleError}</p>
+                                )}
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <svg className="w-3.5 h-3.5 text-[#58a6ff] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                  <span className="text-xs font-medium text-[#f0f6fc] truncate">{cycleName}</span>
+                                  {isActive && (
+                                    <span className="text-[10px] font-semibold text-[#58a6ff] bg-[#58a6ff]/10 border border-[#58a6ff]/30 px-1.5 py-0.5 rounded-full">
+                                      Active Cycle
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {isActive ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveCycle("All")}
+                                      className="text-xs text-[#8b949e] hover:text-[#f85149] px-2 py-1 rounded transition-colors cursor-pointer"
+                                      title="Deactivate this cycle (leaves new applications untagged)"
+                                    >
+                                      Deactivate
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveCycle(cycleName)}
+                                      className="text-xs text-[#8b949e] hover:text-[#58a6ff] px-2 py-1 rounded transition-colors cursor-pointer"
+                                    >
+                                      Make Active
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEditCycle(cycleName)}
+                                    className="text-xs text-[#8b949e] hover:text-[#58a6ff] px-2 py-1 rounded transition-colors cursor-pointer"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleInitiateDeleteCycle(cycleName)}
+                                    className="text-xs text-[#8b949e] hover:text-[#f85149] px-2 py-1 rounded transition-colors cursor-pointer"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 7. SHORTCUTS SECTION */}
             {activeSection === "shortcuts" && (
               <div className="border border-[#30363d] bg-[#161b22] rounded-lg overflow-hidden">
                 <div className="px-5 py-4 border-b border-[#30363d] flex items-center justify-between">
@@ -1134,6 +1418,104 @@ export default function SettingsPage() {
                   : deleteStatusJobCount > 0
                   ? `Reassign & Delete`
                   : "Delete Status"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Deletion Safeguard Modal for Cycles */}
+      {deleteTargetCycle && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-100"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeletingCycle) {
+              setDeleteTargetCycle(null);
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl p-5 flex flex-col gap-4 text-xs animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div
+                className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                  deleteCycleJobCount > 0
+                    ? "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                    : "bg-red-500/10 border border-red-500/20 text-red-400"
+                }`}
+              >
+                {deleteCycleJobCount > 0 ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-[#f0f6fc] leading-snug">
+                  Delete &ldquo;{deleteTargetCycle}&rdquo; cycle?
+                </h3>
+                {deleteCycleJobCount > 0 ? (
+                  <p className="mt-1 text-xs text-[#8b949e] leading-relaxed">
+                    You have{" "}
+                    <span className="font-semibold text-amber-300 font-mono">
+                      {deleteCycleJobCount} {deleteCycleJobCount === 1 ? "application" : "applications"}
+                    </span>{" "}
+                    tagged with this cycle. You can reassign them to another cycle or leave them untagged.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-[#8b949e] leading-relaxed">
+                    No applications are currently tagged with this cycle. Are you sure you want to remove it?
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {deleteCycleJobCount > 0 && (
+              <div className="p-3 bg-[#0d1117] border border-[#30363d] rounded-lg space-y-2">
+                <label className="block text-[11px] font-medium text-[#c9d1d9]">
+                  Reassign existing applications to:
+                </label>
+                <select
+                  value={reassignCycle}
+                  onChange={(e) => setReassignCycle(e.target.value)}
+                  className="w-full bg-[#161b22] border border-[#30363d] text-xs text-[#f0f6fc] rounded-md px-3 py-2 outline-none focus:border-[#58a6ff] cursor-pointer"
+                >
+                  <option value="">(Leave untagged)</option>
+                  {cycles
+                    .filter((c) => c !== deleteTargetCycle)
+                    .map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#30363d]/60">
+              <button
+                type="button"
+                disabled={isDeletingCycle}
+                onClick={() => setDeleteTargetCycle(null)}
+                className="px-3.5 py-1.5 rounded-lg border border-[#30363d] bg-transparent text-[#c9d1d9] hover:bg-[#21262d] font-medium transition-colors cursor-pointer text-xs disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingCycle}
+                onClick={handleConfirmDeleteCycle}
+                className="px-4 py-1.5 rounded-lg text-white font-medium transition-colors cursor-pointer text-xs bg-[#da3633] hover:bg-[#b62324] disabled:opacity-50"
+              >
+                {isDeletingCycle
+                  ? "Deleting..."
+                  : deleteCycleJobCount > 0
+                  ? (reassignCycle ? "Reassign & Delete" : "Untag & Delete")
+                  : "Delete Cycle"}
               </button>
             </div>
           </div>

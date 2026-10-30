@@ -19,6 +19,7 @@ import {
 const CSVImportModal = dynamic(() => import("@/components/CSVImportModal"));
 const ExportCSVModal = dynamic(() => import("@/components/ExportCSVModal"));
 const CleanUpModal = dynamic(() => import("@/components/CleanUpModal"));
+const BatchAssignCycleModal = dynamic(() => import("@/components/BatchAssignCycleModal"));
 
 const STORAGE_SORT_KEY = "jobtrace_table_sort";
 const INITIAL_BATCH = 60;
@@ -26,11 +27,13 @@ const BATCH_SIZE = 60;
 
 interface JobTableProps {
   jobs: JobApplication[];
+  allJobs?: JobApplication[];
   onStatusChange: (id: string, newStatus: ApplicationStatus) => void;
   onSaveEdit: (id: string, updated: Partial<JobApplication>) => void;
   onDeleteJob: (id: string) => Promise<void> | void;
   onDeleteJobs?: (ids: string[], isAll?: boolean) => Promise<void> | void;
   onImportJobs: (newJobs: Record<string, JobApplication>, count: number) => void;
+  onBatchAssignCycle?: (jobIds: string[], targetCycle: string) => Promise<void> | void;
   editingJob?: JobApplication | null;
   onEditJob?: (job: JobApplication | null) => void;
 }
@@ -213,11 +216,13 @@ function getRowStatusStyle(status: string): { borderClass: string; dimClass: str
 
 export default function JobTable({
   jobs,
+  allJobs,
   onStatusChange,
   onSaveEdit,
   onDeleteJob,
   onDeleteJobs,
   onImportJobs,
+  onBatchAssignCycle,
   editingJob: editingJobProp,
   onEditJob,
 }: JobTableProps) {
@@ -232,6 +237,8 @@ export default function JobTable({
     shortcuts,
     extensionSettings,
     filterStyle,
+    cycles,
+    activeCycle,
   } = useSettings();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -265,6 +272,7 @@ export default function JobTable({
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isCleanUpModalOpen, setIsCleanUpModalOpen] = useState(false);
+  const [isBatchAssignModalOpen, setIsBatchAssignModalOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<JobApplication | null>(null);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [sortColumn, setSortColumn] = useState<string>("appliedDate");
@@ -607,6 +615,7 @@ export default function JobTable({
         isImportModalOpen ||
         isExportModalOpen ||
         isCleanUpModalOpen ||
+        isBatchAssignModalOpen ||
         jobToDelete ||
         viewingDetail ||
         selectedRequirementsJob
@@ -1028,6 +1037,25 @@ export default function JobTable({
                     <span className="text-[10px] text-[#8b949e] block">Download as CSV or Excel</span>
                   </div>
                 </button>
+
+                {onBatchAssignCycle && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsActionsOpen(false);
+                      setIsBatchAssignModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#c9d1d9] hover:text-[#f0f6fc] hover:bg-[#21262d] rounded-md transition-colors text-left cursor-pointer"
+                  >
+                    <svg className="w-4 h-4 text-[#58a6ff] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <div>
+                      <span className="font-medium block">Assign to Cycle</span>
+                      <span className="text-[10px] text-[#8b949e] block">Batch move applications to a cycle</span>
+                    </div>
+                  </button>
+                )}
 
                 <div className="h-px bg-[#30363d]/60 my-1" />
 
@@ -1673,6 +1701,18 @@ export default function JobTable({
           onDeleteJobs={onDeleteJobs}
           onDeleteJob={onDeleteJob}
           statuses={statuses}
+        />
+      )}
+
+      {isBatchAssignModalOpen && onBatchAssignCycle && (
+        <BatchAssignCycleModal
+          isOpen={isBatchAssignModalOpen}
+          onClose={() => setIsBatchAssignModalOpen(false)}
+          jobs={allJobs || jobs}
+          filteredJobs={sortedJobs}
+          cycles={cycles}
+          activeCycle={activeCycle}
+          onAssign={onBatchAssignCycle}
         />
       )}
 

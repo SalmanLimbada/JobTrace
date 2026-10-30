@@ -157,7 +157,7 @@ interface SettingsContextType {
   cycles: string[];
   activeCycle: string;
   setActiveCycle: (cycle: string) => void;
-  addCycle: (name: string) => boolean;
+  addCycle: (name: string, makeActive?: boolean) => boolean;
   renameCycle: (oldName: string, newName: string) => boolean;
   deleteCycle: (name: string, reassignTo?: string) => boolean;
   cloudSyncStatus: CloudSyncStatus;
@@ -912,7 +912,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     scheduleCloudSync({ activeCycle: cycle });
   };
 
-  const addCycle = (name: string): boolean => {
+  const addCycle = (name: string, makeActive: boolean = false): boolean => {
     const trimmed = name.trim();
     if (!trimmed) return false;
     if (trimmed.toLowerCase() === "all") return false;
@@ -921,13 +921,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     const next = [...cycles, trimmed];
     setCyclesState(next);
-    setActiveCycleState(trimmed);
+    if (makeActive) {
+      setActiveCycleState(trimmed);
+    }
     try {
       localStorage.setItem(STORAGE_CYCLES_KEY, JSON.stringify(next));
-      localStorage.setItem(STORAGE_ACTIVE_CYCLE_KEY, trimmed);
+      if (makeActive) {
+        localStorage.setItem(STORAGE_ACTIVE_CYCLE_KEY, trimmed);
+      }
       window.dispatchEvent(new Event("jobtrace_settings_updated"));
     } catch {}
-    scheduleCloudSync({ cycles: next, activeCycle: trimmed });
+    scheduleCloudSync(makeActive ? { cycles: next, activeCycle: trimmed } : { cycles: next });
     return true;
   };
 
@@ -987,7 +991,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const next = cycles.filter((c) => c !== name);
     setCyclesState(next);
 
-    const nextActive = activeCycle === name ? (next[0] || "All") : activeCycle;
+    const nextActive = activeCycle === name ? "All" : activeCycle;
     setActiveCycleState(nextActive);
 
     try {

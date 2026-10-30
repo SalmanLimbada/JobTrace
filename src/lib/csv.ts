@@ -42,6 +42,7 @@ export function exportApplicationsToCSV(
     "Role",
     "Status",
     "Date Applied",
+    "Cycle",
     ...activeCustom.map((f) => f.name),
     "Posting URL",
     "Notes",
@@ -63,6 +64,7 @@ export function exportApplicationsToCSV(
       escapeCSV(job.role),
       escapeCSV(job.status),
       escapeCSV(job.appliedDate),
+      escapeCSV(job.cycle || ""),
       ...customValues,
       escapeCSV(job.url),
       escapeCSV(job.notes),
@@ -89,6 +91,7 @@ export function exportApplicationsToExcel(
     "Role",
     "Status",
     "Date Applied",
+    "Cycle",
     ...activeCustom.map((f) => f.name),
     "Posting URL",
     "Notes",
@@ -126,6 +129,7 @@ export function exportApplicationsToExcel(
         job.role,
         job.status,
         job.appliedDate,
+        job.cycle || "",
         ...customValues,
         job.url,
         job.notes,
@@ -232,6 +236,7 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
   let salaryIdx = findIndex(["salary", "compensation", "pay", "rate", "hourly", "annual"]);
   let locationIdx = findIndex(["location", "city", "workplace", "remote", "mode"]);
   let deadlineIdx = findIndex(["deadline", "deadlinedate", "due", "duedate", "nextround", "interviewdate"]);
+  let cycleIdx = findIndex(["cycle", "recruitingcycle", "season", "term"]);
 
   // If company or role wasn't matched by name, assign to the first unclaimed column
   if (companyIdx === -1) {
@@ -284,7 +289,7 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
   };
 
   // Claimed column indices
-  const claimed = new Set([companyIdx, roleIdx, statusIdx, dateIdx, urlIdx, notesIdx, salaryIdx, locationIdx, deadlineIdx].filter((i) => i !== -1));
+  const claimed = new Set([companyIdx, roleIdx, statusIdx, dateIdx, urlIdx, notesIdx, salaryIdx, locationIdx, deadlineIdx, cycleIdx].filter((i) => i !== -1));
   const extraCols: { idx: number; key: string }[] = [];
   rawHeaders.forEach((h, idx) => {
     if (!claimed.has(idx) && h && String(h).trim().length > 0) {
@@ -316,11 +321,13 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
     const salary = (salaryIdx !== -1 ? cols[salaryIdx] : "") || "";
     const location = (locationIdx !== -1 ? cols[locationIdx] : "") || "";
     const deadlineDate = (deadlineIdx !== -1 ? cols[deadlineIdx] : "") || "";
+    const cycle = (cycleIdx !== -1 ? cols[cycleIdx]?.trim() : "") || "";
 
     const customFields: Record<string, string> = {};
     if (salary) customFields.salary = salary;
     if (location) customFields.location = location;
     if (deadlineDate) customFields.deadlineDate = deadlineDate;
+    if (cycle) customFields.cycle = cycle;
     for (const ec of extraCols) {
       const val = cols[ec.idx]?.trim();
       if (val) {
@@ -340,6 +347,7 @@ export function parseApplicationsFromRows(matrix: string[][]): CSVParseResult {
       salary: salary || undefined,
       location: location || undefined,
       deadlineDate: deadlineDate || undefined,
+      cycle: cycle || undefined,
       customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
     };
 
