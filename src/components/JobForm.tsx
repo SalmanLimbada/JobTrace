@@ -14,6 +14,7 @@ export interface NewJobPayload {
   appliedDate?: string;
   url: string;
   notes: string;
+  cycle?: string;
   jobId?: string;
   salary?: string;
   location?: string;
@@ -29,7 +30,7 @@ interface JobFormProps {
 }
 
 export default function JobForm({ onAddJob, existingJobs, onOpenJob }: JobFormProps) {
-  const { customFields, statuses, standardColumns, columnOrder } = useSettings();
+  const { customFields, statuses, standardColumns, columnOrder, activeCycle } = useSettings();
 
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
@@ -111,6 +112,7 @@ export default function JobForm({ onAddJob, existingJobs, onOpenJob }: JobFormPr
       appliedDate: standardColumns.appliedDate ? (appliedDate || today) : today,
       url: url.trim() || "#",
       notes: notes.trim(),
+      cycle: activeCycle && activeCycle !== "All" ? activeCycle : undefined,
       jobId: targetJobId || undefined,
       salary: fieldValues["salary"]?.trim() || undefined,
       location: fieldValues["location"]?.trim() || undefined,

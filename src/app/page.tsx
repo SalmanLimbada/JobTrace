@@ -18,7 +18,11 @@ const GUEST_STORAGE_KEY = "job_tracker_guest_jobs";
 
 export default function Home() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const { timeframe, setTimeframe } = useSettings();
+  const { timeframe, setTimeframe, cycles, activeCycle, setActiveCycle, addCycle } = useSettings();
+  const [isCycleDropdownOpen, setIsCycleDropdownOpen] = useState(false);
+  const [isCreateCycleModalOpen, setIsCreateCycleModalOpen] = useState(false);
+  const [newCycleInput, setNewCycleInput] = useState("");
+  const cycleDropdownRef = useRef<HTMLDivElement>(null);
   const [jobs, setJobs] = useState<Record<string, JobApplication>>(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -189,6 +193,11 @@ export default function Home() {
             extractJobIdFromUrl(row.url) ||
             undefined;
 
+          const cycleVal =
+            row.cycle ||
+            cleanedCustomFields?.cycle ||
+            undefined;
+
           map[row.id] = {
             id: row.id,
             userId: row.user_id,
@@ -202,6 +211,7 @@ export default function Home() {
             location: row.location || undefined,
             deadlineDate: row.deadline_date || undefined,
             jobId: extractedJobId,
+            cycle: cycleVal,
             customFields: cleanedCustomFields,
             keyRequirements: parsedRequirements,
             createdAt: row.created_at || undefined,
@@ -352,13 +362,89 @@ export default function Home() {
     return () => window.removeEventListener("jobtrace_status_renamed", handleStatusRenamed);
   }, []);
 
+  // Listen for renamed or deleted cycles
+  useEffect(() => {
+    function handleCycleRenamed(e: Event) {
+      const detail = (e as CustomEvent<{ oldCycle: string; newCycle: string }>).detail;
+      if (!detail?.oldCycle || !detail?.newCycle) return;
+      setJobs((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const id in next) {
+          if (next[id]?.cycle === detail.oldCycle) {
+            next[id] = { ...next[id], cycle: detail.newCycle };
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+
+    function handleCycleDeleted(e: Event) {
+      const detail = (e as CustomEvent<{ deletedCycle: string; reassignTo: string }>).detail;
+      if (!detail?.deletedCycle) return;
+      setJobs((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const id in next) {
+          if (next[id]?.cycle === detail.deletedCycle) {
+            next[id] = {
+              ...next[id],
+              cycle: detail.reassignTo && detail.reassignTo !== "All" ? detail.reassignTo : undefined,
+            };
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+
+    window.addEventListener("jobtrace_cycle_renamed", handleCycleRenamed);
+    window.addEventListener("jobtrace_cycle_deleted", handleCycleDeleted);
+    return () => {
+      window.removeEventListener("jobtrace_cycle_renamed", handleCycleRenamed);
+      window.removeEventListener("jobtrace_cycle_deleted", handleCycleDeleted);
+    };
+  }, []);
+
+  // Click outside to close cycle dropdown
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (cycleDropdownRef.current && !cycleDropdownRef.current.contains(e.target as Node)) {
+        setIsCycleDropdownOpen(false);
+      }
+    }
+    if (isCycleDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isCycleDropdownOpen]);
+
   const jobList = Object.values(jobs);
   const totalMasterCount = jobList.length;
 
+  // Filter jobs by active recruiting cycle (if one is selected and not "All")
+  const cycleFilteredJobs = useMemo(() => {
+    if (!activeCycle || activeCycle === "All") return jobList;
+    return jobList.filter((j) => j.cycle === activeCycle);
+  }, [jobList, activeCycle]);
+
+  // Compute job count per cycle for switcher badge
+  const cycleJobCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: jobList.length };
+    for (let i = 0; i < jobList.length; i++) {
+      const c = jobList[i].cycle;
+      if (c) {
+        counts[c] = (counts[c] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [jobList]);
+
   const filteredJobs = useMemo(() => {
-    if (timeframe.preset === "all") return jobList;
-    return jobList.filter((j) => isJobInTimeframe(j.appliedDate, timeframe));
-  }, [jobList, timeframe]);
+    if (timeframe.preset === "all") return cycleFilteredJobs;
+    return cycleFilteredJobs.filter((j) => isJobInTimeframe(j.appliedDate, timeframe));
+  }, [cycleFilteredJobs, timeframe]);
 
   const stats = useMemo(() => {
     let interviews = 0;
@@ -398,6 +484,7 @@ export default function Home() {
       location: payload.location,
       deadlineDate: payload.deadlineDate,
       jobId: effectiveJobId,
+      cycle: payload.cycle,
       customFields: payload.customFields,
       keyRequirements: payload.keyRequirements,
       createdAt: new Date().toISOString(),
@@ -429,10 +516,13 @@ export default function Home() {
       if (payload.location) dbRow.location = payload.location;
       if (payload.deadlineDate) dbRow.deadline_date = payload.deadlineDate;
 
-      if (effectiveJobId || payload.customFields || payload.keyRequirements) {
+      if (effectiveJobId || payload.cycle || payload.customFields || payload.keyRequirements) {
         const mergedCustom: Record<string, unknown> = { ...(payload.customFields || {}) };
         if (effectiveJobId) {
           mergedCustom.jobId = effectiveJobId;
+        }
+        if (payload.cycle) {
+          mergedCustom.cycle = payload.cycle;
         }
         if (payload.keyRequirements) {
           mergedCustom._keyRequirements = JSON.stringify(payload.keyRequirements);
@@ -523,13 +613,16 @@ export default function Home() {
       if (updated.location !== undefined) dbPayload.location = updated.location;
       if (updated.deadlineDate !== undefined) dbPayload.deadline_date = updated.deadlineDate;
 
-      if (updated.jobId !== undefined || updated.customFields !== undefined || updated.keyRequirements !== undefined) {
+      if (updated.jobId !== undefined || updated.cycle !== undefined || updated.customFields !== undefined || updated.keyRequirements !== undefined) {
         const mergedCustom: Record<string, unknown> = {
           ...(jobs[id]?.customFields || {}),
           ...(updated.customFields || {}),
         };
         if (updated.jobId !== undefined) {
           mergedCustom.jobId = updated.jobId;
+        }
+        if (updated.cycle !== undefined) {
+          mergedCustom.cycle = updated.cycle;
         }
         const requirementsToSave =
           updated.keyRequirements !== undefined ? updated.keyRequirements : jobs[id]?.keyRequirements;
@@ -745,9 +838,112 @@ export default function Home() {
 
         <div className="mb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f0f6fc]">
-              Dashboard
-            </h1>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f0f6fc]">
+                Dashboard
+              </h1>
+
+              {/* Recruiting Cycle Switcher Pill */}
+              <div className="relative" ref={cycleDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsCycleDropdownOpen(!isCycleDropdownOpen)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-[#30363d] bg-[#161b22] hover:bg-[#21262d] text-[#c9d1d9] hover:text-[#f0f6fc] transition-colors cursor-pointer"
+                  title="Switch Recruiting Cycle"
+                >
+                  <svg className="w-3.5 h-3.5 text-[#58a6ff]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{activeCycle === "All" || !activeCycle ? "All Cycles" : activeCycle}</span>
+                  <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-full bg-[#0d1117] text-[#8b949e]">
+                    {cycleJobCounts[activeCycle || "All"] || 0}
+                  </span>
+                  <svg className="w-3 h-3 text-[#8b949e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Switcher Dropdown */}
+                {isCycleDropdownOpen && (
+                  <div className="absolute left-0 top-full mt-1.5 z-40 w-64 rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl p-1.5 animate-in fade-in zoom-in-95 duration-100 text-xs">
+                    <div className="px-2.5 py-1.5 text-[10px] font-semibold text-[#8b949e] uppercase tracking-wider">
+                      Recruiting Cycles
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveCycle("All");
+                        setIsCycleDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                        activeCycle === "All" || !activeCycle
+                          ? "bg-[#21262d] text-[#f0f6fc] font-semibold"
+                          : "text-[#8b949e] hover:bg-[#21262d]/50 hover:text-[#c9d1d9]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {(activeCycle === "All" || !activeCycle) && (
+                          <svg className="w-3 h-3 text-[#58a6ff]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        <span className={activeCycle === "All" || !activeCycle ? "" : "ml-5"}>All Cycles</span>
+                      </div>
+                      <span className="font-mono text-[10px] text-[#8b949e]">{cycleJobCounts["All"] || 0}</span>
+                    </button>
+
+                    {cycles.map((c) => {
+                      const isSelected = activeCycle === c;
+                      const count = cycleJobCounts[c] || 0;
+
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            setActiveCycle(c);
+                            setIsCycleDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                            isSelected
+                              ? "bg-[#21262d] text-[#f0f6fc] font-semibold"
+                              : "text-[#8b949e] hover:bg-[#21262d]/50 hover:text-[#c9d1d9]"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isSelected ? (
+                              <svg className="w-3 h-3 text-[#58a6ff] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : (
+                              <div className="w-3 shrink-0" />
+                            )}
+                            <span className="truncate">{c}</span>
+                          </div>
+                          <span className="font-mono text-[10px] text-[#8b949e] shrink-0 ml-2">{count}</span>
+                        </button>
+                      );
+                    })}
+
+                    <div className="my-1 border-t border-[#30363d]/60" />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCycleDropdownOpen(false);
+                        setNewCycleInput("");
+                        setIsCreateCycleModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-[#58a6ff] hover:bg-[#21262d] transition-colors cursor-pointer font-medium"
+                    >
+                      <span className="font-bold text-sm leading-none">+</span>
+                      <span>Create New Cycle...</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
             <p className="text-xs text-[#8b949e] mt-0.5">
               Track and manage your job applications
             </p>
@@ -797,6 +993,67 @@ export default function Home() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
       />
+
+      {/* Quick Create Cycle Modal */}
+      {isCreateCycleModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-100"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsCreateCycleModalOpen(false);
+          }}
+        >
+          <div className="w-full max-w-sm rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl p-5 flex flex-col gap-4 text-xs animate-in zoom-in-95 duration-150">
+            <div>
+              <h3 className="text-sm font-semibold text-[#f0f6fc]">Create Recruiting Cycle</h3>
+              <p className="mt-1 text-xs text-[#8b949e]">
+                Group your applications into a season (e.g. &ldquo;Summer 2026&rdquo;, &ldquo;New Grad 2025&rdquo;).
+              </p>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = newCycleInput.trim();
+                if (!trimmed) return;
+                const success = addCycle(trimmed);
+                if (success) {
+                  setIsCreateCycleModalOpen(false);
+                  setNewCycleInput("");
+                }
+              }}
+              className="space-y-3"
+            >
+              <input
+                type="text"
+                autoFocus
+                placeholder="Cycle name (e.g. Summer 2026)"
+                value={newCycleInput}
+                onChange={(e) => setNewCycleInput(e.target.value)}
+                className="w-full bg-[#0d1117] border border-[#30363d] text-xs text-[#f0f6fc] placeholder-[#8b949e] rounded-md px-3 py-2 outline-none focus:border-[#58a6ff]"
+              />
+
+              <div className="flex items-center justify-end gap-2 pt-1 border-t border-[#30363d]/60">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateCycleModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-lg border border-[#30363d] bg-transparent text-[#c9d1d9] hover:bg-[#21262d] font-medium transition-colors cursor-pointer text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newCycleInput.trim()}
+                  className="px-4 py-1.5 rounded-lg text-white font-medium transition-colors cursor-pointer text-xs bg-[#238636] hover:bg-[#2ea043] disabled:opacity-40"
+                >
+                  Create & Select
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <ScrollNav />
     </div>

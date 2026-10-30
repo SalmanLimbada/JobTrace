@@ -26,7 +26,7 @@ export default function EditJobModal({
   onDelete,
   existingJobs,
 }: EditJobModalProps) {
-  const { customFields, statuses } = useSettings();
+  const { customFields, statuses, cycles } = useSettings();
   const activeCustomFields = customFields.filter((f) => f.enabled && f.id !== "notes");
 
   const [company, setCompany] = useState("");
@@ -34,6 +34,7 @@ export default function EditJobModal({
   const [status, setStatus] = useState<ApplicationStatus>("Applied");
   const [appliedDate, setAppliedDate] = useState("");
   const [url, setUrl] = useState("");
+  const [cycle, setCycle] = useState("");
   const [notes, setNotes] = useState("");
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -46,6 +47,7 @@ export default function EditJobModal({
     setStatus(job.status || "Applied");
     setAppliedDate(job.appliedDate || "");
     setUrl(job.url === "#" ? "" : job.url || "");
+    setCycle(job.cycle || "");
     setNotes(job.notes || "");
 
     const custom: Record<string, string> = { ...(job.customFields || {}) };
@@ -87,6 +89,7 @@ export default function EditJobModal({
       status,
       appliedDate,
       url: url.trim() || "#",
+      cycle: cycle.trim() || undefined,
       notes: notes.trim(),
       jobId: customValues["jobId"]?.trim() || effectiveJobId || undefined,
       salary: customValues["salary"]?.trim() || undefined,
@@ -231,6 +234,27 @@ export default function EditJobModal({
               />
             </div>
           </div>
+
+          {/* Recruiting Cycle (if user has cycles defined or job has a cycle) */}
+          {(cycles.length > 0 || job?.cycle) && (
+            <div>
+              <label className="block text-[#8b949e] text-[11px] font-medium mb-1.5">
+                Recruiting Cycle
+              </label>
+              <select
+                value={cycle}
+                onChange={(e) => setCycle(e.target.value)}
+                className="w-full bg-[#0d1117] border border-[#30363d] text-[#f0f6fc] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#58a6ff] transition-colors cursor-pointer"
+              >
+                <option value="">(No cycle)</option>
+                {Array.from(new Set([...cycles, ...(job?.cycle ? [job.cycle] : [])])).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Active Custom Fields (if any) */}
           {activeCustomFields.length > 0 && (
